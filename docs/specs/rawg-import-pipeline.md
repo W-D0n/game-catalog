@@ -79,8 +79,9 @@ Boucle d'import — **écrit** : `games`, `platforms`, `game_platforms`, `import
 
 | Catégorie | Exemple | Traitement |
 |---|---|---|
-| Système (transitoire) | HTTP 502, rate-limit, corps non-JSON momentané | retry + backoff (5x) |
-| Système (persistant) | échec après 5 tentatives | throw avec contexte, progression préservée via import_state |
+| Système (transitoire) | HTTP 429, 5xx, corps non-JSON momentané | retry + backoff (5x) |
+| Système (permanent) | HTTP 4xx hors 429 | `ProviderError`, levé immédiatement sans retry |
+| Quota / auth | HTTP 401, 403 | `ProviderQuotaError` → arrêt **propre** du service, progression préservée |
 | Domaine | `released` absent | `releaseYear = null`, le jeu est tout de même importé |
 
 ## 8. Idempotence des mutations
@@ -93,11 +94,11 @@ Boucle d'import — **écrit** : `games`, `platforms`, `game_platforms`, `import
 
 ## 9. Lacunes identifiées
 
-- [ ] **Quota mensuel** : plan gratuit RAWG = 20 000 requêtes/mois. À `PAGE_SIZE=40`,
-  cela plafonne à ~800 000 jeux/mois. Le catalogue complet peut dépasser ce quota
-  sur un seul mois — aucune gestion du dépassement de quota n'est implémentée
-  (l'API renverra une erreur, gérée comme un échec persistant). Comportement à
-  vérifier : quel code HTTP RAWG renvoie en cas de quota épuisé.
+- [x] **Quota mensuel** : plan gratuit RAWG = 20 000 requêtes/mois (~800 000 jeux/mois
+  à `PAGE_SIZE=40`). Détection implémentée **par classe de statut** : 401/403 →
+  `ProviderQuotaError` → arrêt propre du service, progression préservée. Robuste quel
+  que soit le code exact renvoyé par RAWG. **Reste à confirmer** : le code HTTP précis
+  du quota épuisé (401 vs 403 vs 429) — la gestion par classe couvre les trois.
 - [ ] **Terminaison non vérifiée en conditions réelles** : on suppose que RAWG
   renvoie `results: []` (HTTP 200) au-delà de la dernière page. Si c'est une
   erreur HTTP à la place, la fin de catalogue déclenchera un échec persistant

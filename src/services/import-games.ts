@@ -1,8 +1,8 @@
 import { db } from "../database/db";
-import { saveGame } from "../database/game-repository";
 import { savePlatforms } from "../database/platform-repository";
 import { deduplicateGames } from "../deduplication/deduplicate-games";
-import type { GameProvider } from "../providers/provider";
+import { ProviderQuotaError, type GameProvider } from "../providers/provider";
+import type { Game } from "../types/game";
 
 async function getLastPage(provider: string): Promise<number> {
   const [row] = await db<{ last_page: number }[]>`
@@ -33,7 +33,18 @@ export async function importGames(
   for (let page = startPage; page <= maxPages; page++) {
     console.log(`${provider.name}: import page ${page}/${maxPages}...`);
 
-    const games = await provider.fetchPage(page);
+    let games: Game[];
+    try {
+      games = await provider.fetchPage(page);
+    } catch (error) {
+      if (error instanceof ProviderQuotaError) {
+        console.log(
+          `${provider.name}: quota épuisé — arrêt propre. Reprise à la page ${page} au prochain lancement.`
+        );
+        return;
+      }
+      throw error;
+    }
 
     if (games.length === 0) {
       console.log(`${provider.name}: fin de la base atteinte à la page ${page}.`);

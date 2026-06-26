@@ -1,9 +1,14 @@
 import type { Game } from "../../types/game";
-import type { GameProvider } from "../provider";
+import { ProviderError, ProviderQuotaError, type GameProvider } from "../provider";
 
 const PAGE_SIZE = 40;
 const DELAY_MS = 500;
 const MAX_RETRIES = 5;
+
+/** Un statut transitoire vaut la peine d'être retenté ; un 4xx (hors 429) non. */
+export function isRetriableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
 
 function backoffDelay(attempt: number): Promise<void> {
   const ms = 1000 * 2 ** (attempt - 1);
@@ -17,20 +22,37 @@ async function fetchPageWithRetry(url: URL, page: number): Promise<RawgResponse>
     try {
       const response = await fetch(url);
 
-      if (!response.ok) {
-        lastError = `HTTP ${response.status}`;
-        await backoffDelay(attempt);
-        continue;
+      if (response.ok) {
+        return (await response.json()) as RawgResponse;
       }
 
-      return (await response.json()) as RawgResponse;
+      if (response.status === 401 || response.status === 403) {
+        throw new ProviderQuotaError(
+          "rawg",
+          `RAWG page ${page} : clé invalide ou quota épuisé (HTTP ${response.status})`
+        );
+      }
+
+      if (!isRetriableStatus(response.status)) {
+        throw new ProviderError(
+          "rawg",
+          `RAWG page ${page} : erreur permanente (HTTP ${response.status})`
+        );
+      }
+
+      lastError = `HTTP ${response.status}`;
+      await backoffDelay(attempt);
     } catch (error) {
+      if (error instanceof ProviderError) {
+        throw error;
+      }
       lastError = error instanceof Error ? error.message : String(error);
       await backoffDelay(attempt);
     }
   }
 
-  throw new Error(
+  throw new ProviderError(
+    "rawg",
     `RAWG page ${page} : échec après ${MAX_RETRIES} tentatives (${lastError})`
   );
 }
