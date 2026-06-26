@@ -3,6 +3,37 @@ import type { GameProvider } from "../provider";
 
 const PAGE_SIZE = 40;
 const DELAY_MS = 500;
+const MAX_RETRIES = 5;
+
+function backoffDelay(attempt: number): Promise<void> {
+  const ms = 1000 * 2 ** (attempt - 1);
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchPageWithRetry(url: URL, page: number): Promise<RawgResponse> {
+  let lastError = "inconnu";
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        lastError = `HTTP ${response.status}`;
+        await backoffDelay(attempt);
+        continue;
+      }
+
+      return (await response.json()) as RawgResponse;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      await backoffDelay(attempt);
+    }
+  }
+
+  throw new Error(
+    `RAWG page ${page} : échec après ${MAX_RETRIES} tentatives (${lastError})`
+  );
+}
 
 interface RawgGame {
   id: number;
@@ -32,10 +63,9 @@ export class RawgProvider implements GameProvider {
     url.searchParams.set("page", String(page));
     url.searchParams.set("page_size", String(PAGE_SIZE));
 
-    const response = await fetch(url);
-    const data = (await response.json()) as RawgResponse;
+    const data = await fetchPageWithRetry(url, page);
 
-    if (data.next === null) {
+    if (data.results.length === 0) {
       return [];
     }
 
