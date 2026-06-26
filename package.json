@@ -11,7 +11,8 @@
   },
   "scripts": {
     "import": "bun run src/index.ts",
-    "monitor": "bun run src/services/monitor.ts"
+    "monitor": "bun run src/services/monitor.ts",
+    "test": "bun test"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
