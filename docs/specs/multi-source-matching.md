@@ -14,6 +14,11 @@ relations entre œuvres (remake, remaster, DLC, édition).
 Le problème n'est pas "dédupliquer" — c'est **modéliser une ontologie de jeux
 avec provenance par champ**.
 
+> **Extension de périmètre (2026-07-04)** : le matching doit aussi couvrir les
+> **crédits nominatifs** (personnes physiques — développeurs individuels,
+> artistes, compositeurs, etc.), pas seulement les studios/éditeurs à l'échelle
+> entreprise. Voir §4 et §9.
+
 ## 2. Glossaire
 
 | Terme | Définition |
@@ -78,10 +83,35 @@ companies                    -- studios / éditeurs
 game_companies
   canonical_id, company_id,
   role ∈ (developer, publisher, porting, supporting)
+
+people                       -- crédits nominatifs (extension, pas remplacement)
+  id, name
+game_credits
+  canonical_id, person_id,
+  role ∈ (director, writer, composer, artist, programmer, ...)
 ```
+
+> **Extension crédits nominatifs** : `people`/`game_credits` s'ajoutent à
+> `companies`/`game_companies`, ils ne les remplacent pas — l'un couvre les
+> entreprises, l'autre les individus. Source la plus probable : MobyGames
+> (granularité de crédits historiquement la plus fine, cf. `docs/overview.md`
+> — "bonne couverture rétro"), à confirmer contre sa doc live avant
+> implémentation (checklist §9, point non coché). Liste de rôles ci-dessus
+> non exhaustive — à valider contre les données réelles au moment de
+> l'implémentation (même principe que les seuils de scoring, §10).
 
 > Aucune de ces tables/colonnes n'est créée tant qu'IGDB ne coule pas
 > (règle : zéro code préemptif).
+
+> ⚠️ **Corrections post-vérification live (§9)** :
+> - `release_status` ci-dessus doit provenir de `game_status` IGDB (pas `status`, déprécié) — voir §6.
+> - `game_companies.role` suppose un rôle unique par ligne. Le modèle IGDB réel
+>   (`involved_companies`) expose 4 booléens indépendants et cumulables
+>   (`developer`, `publisher`, `porting`, `supporting`) — une société peut être
+>   développeur ET éditeur sur la même ligne. **Décision à prendre avant
+>   implémentation** : soit `game_companies` stocke les 4 booléens tels quels,
+>   soit on éclate une ligne IGDB en plusieurs lignes `game_companies` (une par
+>   rôle vrai). Non tranché.
 
 ## 5. Algorithme de matching
 
@@ -121,6 +151,14 @@ game_companies
 | popularité / ratings | RAWG | IGDB |
 | screenshots | RAWG | IGDB |
 
+> ⚠️ Ligne « category / status » à corriger : les champs IGDB `category` et
+> `status` sont **dépréciés** (`[deprecated = true]` dans le schéma proto v4
+> live). Les remplaçants non dépréciés sont `game_type` (remplace `category`)
+> et `game_status` (remplace `status`) — tous deux des références vers des
+> endpoints de lookup (`game_types`, `game_statuses`), pas des enums inline.
+> La précédence IGDB > RAWG reste valide, seuls les noms de champs source
+> changent. Voir §9.
+
 ## 7. Deux modes de synchronisation
 
 - **Backfill** (existant) : crawl par page, `import_state.last_page`.
@@ -142,13 +180,44 @@ Les éléments suivants sont donnés **de mémoire** et doivent être confirmés
 contre la documentation officielle avant tout code (règle : ne jamais asserter
 une API sans vérifier) :
 
-- [ ] IGDB : champ `category` et ses valeurs (main_game, remake, remaster, dlc, expansion…)
-- [ ] IGDB : champ `status` et ses valeurs (released, early_access, alpha, beta, cancelled…)
-- [ ] IGDB : `involved_companies` + rôles (developer, publisher, porting, supporting)
-- [ ] IGDB : `version_parent` / `parent_game` pour les relations
-- [ ] IGDB : filtre `updated_at` pour l'incrémental
+**Vérifié le 2026-07-04** contre le schéma proto v4 live (`https://api.igdb.com/v4/igdbapi.proto`) :
+
+- [x] IGDB : champ `category` — **existe mais déprécié** (`[deprecated = true]`,
+  champ 8). Valeurs historiques (`GameCategoryEnum`, lui-même déprécié) :
+  `main_game=0, dlc_addon=1, expansion=2, bundle=3, standalone_expansion=4,
+  mod=5, episode=6, season=7, remake=8, remaster=9, expanded_game=10, port=11,
+  fork=12, pack=13, update=14`. **Remplaçant non déprécié : `game_type`**
+  (champ 60), référence vers l'endpoint de lookup `game_types`.
+- [x] IGDB : champ `status` — **existe mais déprécié** (`[deprecated = true]`,
+  champ 37). Valeurs historiques (`GameStatusEnum`, lui-même déprécié) :
+  `released=0, alpha=2, beta=3, early_access=4, offline=5, cancelled=6,
+  rumored=7, delisted=8`. **Remplaçant non déprécié : `game_status`**
+  (champ 59), référence vers l'endpoint de lookup `game_statuses`.
+- [x] IGDB : `involved_companies` — confirmé, mais **pas un champ `role`
+  unique** : chaque ligne `InvolvedCompany` expose 4 booléens indépendants et
+  cumulables `developer`, `publisher`, `porting`, `supporting` (+ `id`,
+  `company`, `game`, `created_at`, `updated_at`, `checksum`). Décision de
+  modélisation à prendre — voir §4.
+- [x] IGDB : `version_parent` / `parent_game` — confirmés tels quels, non
+  dépréciés, tous deux de type `Game` (auto-référence). Conformes à
+  l'hypothèse de la spec.
+- [x] IGDB : filtre `updated_at` — confirmé, non déprécié,
+  `google.protobuf.Timestamp` (champ 44). Filtre incrémental faisable tel que
+  prévu en §7.
+
+**Non vérifié** (hors périmètre de la vérification du 2026-07-04) :
+
 - [ ] RAWG : filtre `updated` et fiabilité de `developers`/`publishers`
-- [ ] MobyGames : granularité réelle des crédits + contraintes d'API
+- [ ] MobyGames : granularité réelle des crédits + contraintes d'API — **condition
+  bloquante pour l'extension crédits nominatifs** (§1, §4) : confirmer que
+  MobyGames expose bien des crédits par personne (pas seulement par studio)
+  et sous quelle forme (endpoint, rôles disponibles, limites de rate-limit)
+  avant d'implémenter `people`/`game_credits`.
+- [ ] IGDB : endpoints `credits` / `character` / `involved_companies` à
+  l'échelle individu — vérifier si IGDB expose des crédits nominatifs
+  garantis complets, ou si cette source reste limitée à l'échelle entreprise
+  (auquel cas MobyGames devient l'autorité de précédence pour ce champ, à
+  ajouter en §6 une fois tranché).
 
 ## 10. Lacunes identifiées
 
@@ -158,3 +227,13 @@ une API sans vérifier) :
   re-scinder ou fusionner après nouvelle donnée) non spécifiée.
 - [ ] Détection des éditions : la liste de suffixes (étape 1) est un point de
   départ, pas exhaustive.
+- [ ] **Champs source `category`/`status` à corriger** (§4, §6) : remplacer par
+  `game_type`/`game_status` (lookups par id) suite à la vérification live du
+  2026-07-04 — voir §9.
+- [ ] **Modélisation `game_companies.role` non tranchée** (§4) : 4 booléens
+  IGDB cumulables (`developer`/`publisher`/`porting`/`supporting`) vs un rôle
+  unique par ligne côté modèle cible — voir §9.
+- [ ] **Crédits nominatifs (`people`/`game_credits`) non implémentés** —
+  extension de périmètre actée le 2026-07-04, dépend de la vérification
+  MobyGames/IGDB non faite (§9). Ni la source d'autorité ni la liste de rôles
+  ne sont tranchées.
