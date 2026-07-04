@@ -109,37 +109,55 @@ game_companies                -- une ligne par (canonical_id, company_id)
 
 ## 5. Algorithme de matching
 
-**Étape 1 — Normalisation de titre** (étend `normalizeTitle` actuel)
+**Étape 1 — Normalisation de titre** — **implémenté** (2026-07-05) sous
+`normalizeMatchingTitle` (`src/normalizers/matching-title-normalizer.ts`),
+**distinct** de `normalizeTitle` (dédup intra-source, plus agressif — supprime
+toute ponctuation). `normalizeMatchingTitle` :
 - lowercase, trim, NFKD + suppression diacritiques, suppression ™ ®
+  (dans cet ordre — ™/® doivent être supprimés **avant** `normalize("NFKD")`,
+  sinon NFKD les décompose en lettres "TM"/"R" et le strip ne matche plus rien)
 - strip des suffixes d'édition : `Game of the Year Edition`, `Definitive Edition`, `Remastered`, `GOTY`, `Director's Cut`, `Complete Edition`
 - collapse des espaces
-- **interdit** : stripper le sous-titre après `:` (`Final Fantasy VII` ≠ `Final Fantasy VII: Remake`)
+- **conserve la ponctuation** (contrairement à `normalizeTitle`) et **interdit**
+  de stripper le sous-titre après `:` (`Final Fantasy VII` ≠ `Final Fantasy VII: Remake`)
 
-**Étape 2 — Blocking**
-- Clé = titre normalisé + année **±1** (les sources se contredisent souvent d'un an)
-- Tolérance élargie pour les jeux flaggés `early_access`
-- ⚠️ **Garde-fou obligatoire (trouvé en calibrage, 2026-07-04)** : si le titre
-  normalisé fait moins de **3 caractères**, ne pas l'utiliser comme clé de
-  blocking. Des titres comme `"!!!"` normalisent tous vers `""` et
-  collisionnent en masse entre eux sans rapport (741 321 collisions parasites
-  sur 942 825 mesurées avant ce garde-fou — 79% de bruit pur). En dessous du
-  seuil : traiter comme `pending_review` systématique, jamais de blocking par
-  titre seul.
+**Étape 2 — Blocking** — **implémenté** (`src/matching/blocking.ts`)
+- Clé = titre normalisé exact (le ±1 an s'applique à la décision, étape 4, pas au blocking lui-même)
+- Tolérance élargie pour les jeux flaggés `early_access` — **non implémenté** :
+  aucune donnée `early_access`/`game_status` résolue actuellement (`game_status`
+  IGDB n'est qu'un id brut non résolu en libellé, voir §9) ; à ajouter en
+  session 5 une fois la résolution des lookups faite.
+- ⚠️ **Garde-fou de longueur minimale (3 caractères)** conservé en défense en
+  profondeur, mais son rôle a changé depuis le calibrage du 2026-07-04 : le
+  bug alors trouvé (titres ponctuation-only du type `"!!!"` s'effondrant tous
+  vers `""` avec l'ancien `normalizeTitle`, 741 321 collisions parasites sur
+  942 825 mesurées) **ne se reproduit pas** avec `normalizeMatchingTitle`,
+  puisqu'il préserve la ponctuation (`"!!!"` reste `"!!!"`, distinct de
+  `"****"`). Le garde-fou protège désormais seulement les titres réellement
+  courts (1-2 caractères, ex. `"X"`), un risque résiduel bien plus faible.
 
-**Étape 3 — Scoring multi-signaux dans un bloc**
-- titre normalisé exact → confiance haute
+**Étape 3 — Scoring multi-signaux dans un bloc** — **implémenté**
+(`src/matching/decide-match.ts`, fonction `decideMatch`)
+- titre normalisé exact → confiance haute (garanti par le blocking étape 2)
 - sinon ratio fuzzy (Jaro-Winkler ou token-set) > seuil → candidat — **non
   implémenté en v1** (voir §10, différé)
 - année à ±1 → bonus
 - recouvrement de plateformes (Jaccard sur les sets) → bonus fort (meilleur
-  désambiguïsateur) — **nécessite `normalizePlatformName`**
+  désambiguïsateur) — **nécessite `normalizePlatformName`/`computePlatformOverlap`**
   (`src/normalizers/platform-normalizer.ts`, ajouté 2026-07-04) : RAWG et IGDB
   nomment leurs plateformes différemment (`"PC"` vs `"PC (Microsoft
   Windows)"`, `"Commodore / Amiga"` regroupé côté RAWG vs 7 entrées séparées
   côté IGDB) — sans cette normalisation, le Jaccard sur les chaînes brutes est
   cassé (voir mesure ci-dessous).
 
-**Étape 4 — Décision à 3 bandes — seuils calibrés le 2026-07-04**
+**Étape 4 — Décision à 3 bandes — seuils calibrés le 2026-07-04, implémentés le 2026-07-05**
+
+Le blocking (titre exact) garantit qu'il n'y a que 2 bandes atteignables en
+v1 (`merge` / `pending_review`) — la bande "œuvres distinctes" est déjà
+tranchée en amont par le blocking lui-même (titres différents = blocks
+différents = jamais comparés). Elle ne redeviendra pertinente que si le
+matching fuzzy (non implémenté, voir ci-dessus) introduit des blocks groupant
+des titres non-identiques.
 
 Calibrage effectué sur les collisions réelles RAWG×IGDB en base (799 819
 jeux RAWG × 367 307 jeux IGDB, 199 872 collisions par titre normalisé exact
@@ -268,6 +286,9 @@ une API sans vérifier) :
   que le recouvrement se dégrade silencieusement.
 - [ ] Stratégie de re-matching incrémental (un canonical existant qui doit se
   re-scinder ou fusionner après nouvelle donnée) non spécifiée.
+- [ ] **Tolérance `early_access` (étape 2) non implémentée** : nécessite la
+  résolution du lookup `game_status` IGDB (actuellement un id brut non résolu
+  en libellé dans `raw_metadata`, voir §9) — à faire en session 5.
 - [ ] Détection des éditions : la liste de suffixes (étape 1) est un point de
   départ, pas exhaustive.
 - [ ] **Champs source `category`/`status` à corriger** (§4, §6) : remplacer par
