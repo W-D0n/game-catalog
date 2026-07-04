@@ -14,10 +14,13 @@ relations entre œuvres (remake, remaster, DLC, édition).
 Le problème n'est pas "dédupliquer" — c'est **modéliser une ontologie de jeux
 avec provenance par champ**.
 
-> **Extension de périmètre (2026-07-04)** : le matching doit aussi couvrir les
-> **crédits nominatifs** (personnes physiques — développeurs individuels,
-> artistes, compositeurs, etc.), pas seulement les studios/éditeurs à l'échelle
-> entreprise. Voir §4 et §9.
+> **Extension de périmètre envisagée puis abandonnée (2026-07-04)** : l'idée
+> de couvrir les **crédits nominatifs** (personnes physiques — développeurs
+> individuels, artistes, compositeurs) en plus des studios/éditeurs a été
+> explorée puis abandonnée faute de source gratuite exploitable. Voir §9 pour
+> le détail des trois pistes vérifiées (IGDB, MobyGames, Giant Bomb) et leurs
+> raisons d'échec respectives. Hors périmètre pour l'instant — à rouvrir si
+> une source viable apparaît.
 
 ## 2. Glossaire
 
@@ -83,22 +86,12 @@ companies                    -- studios / éditeurs
 game_companies
   canonical_id, company_id,
   role ∈ (developer, publisher, porting, supporting)
-
-people                       -- crédits nominatifs (extension, pas remplacement)
-  id, name
-game_credits
-  canonical_id, person_id,
-  role ∈ (director, writer, composer, artist, programmer, ...)
 ```
 
-> **Extension crédits nominatifs** : `people`/`game_credits` s'ajoutent à
-> `companies`/`game_companies`, ils ne les remplacent pas — l'un couvre les
-> entreprises, l'autre les individus. Source la plus probable : MobyGames
-> (granularité de crédits historiquement la plus fine, cf. `docs/overview.md`
-> — "bonne couverture rétro"), à confirmer contre sa doc live avant
-> implémentation (checklist §9, point non coché). Liste de rôles ci-dessus
-> non exhaustive — à valider contre les données réelles au moment de
-> l'implémentation (même principe que les seuils de scoring, §10).
+> **Crédits nominatifs (`people`/`game_credits`) — abandonné, pas de table
+> cible.** Envisagé le 2026-07-04 pour couvrir les personnes physiques
+> (développeurs individuels, artistes, compositeurs) en plus des entreprises,
+> puis abandonné faute de source gratuite exploitable — voir §9.
 
 > Aucune de ces tables/colonnes n'est créée tant qu'IGDB ne coule pas
 > (règle : zéro code préemptif).
@@ -208,16 +201,28 @@ une API sans vérifier) :
 **Non vérifié** (hors périmètre de la vérification du 2026-07-04) :
 
 - [ ] RAWG : filtre `updated` et fiabilité de `developers`/`publishers`
-- [ ] MobyGames : granularité réelle des crédits + contraintes d'API — **condition
-  bloquante pour l'extension crédits nominatifs** (§1, §4) : confirmer que
-  MobyGames expose bien des crédits par personne (pas seulement par studio)
-  et sous quelle forme (endpoint, rôles disponibles, limites de rate-limit)
-  avant d'implémenter `people`/`game_credits`.
-- [ ] IGDB : endpoints `credits` / `character` / `involved_companies` à
-  l'échelle individu — vérifier si IGDB expose des crédits nominatifs
-  garantis complets, ou si cette source reste limitée à l'échelle entreprise
-  (auquel cas MobyGames devient l'autorité de précédence pour ce champ, à
-  ajouter en §6 une fois tranché).
+
+**Crédits nominatifs — piste explorée et abandonnée le 2026-07-04** (voir §1, §4) :
+
+- [x] IGDB : endpoints/messages liés aux crédits individuels — **absents**.
+  Vérifié dans le schéma proto v4 live : `Character` désigne des personnages
+  fictifs du jeu (champs `species`, etc.), pas des personnes réelles.
+  `involved_companies` reste strictement à l'échelle entreprise. IGDB n'a
+  aucune structure pour les crédits nominatifs.
+- [x] MobyGames : a bien un tier gratuit non-commercial (720 req/h, distinct
+  de l'abonnement payant `MobyPlus`), mais l'accès nécessite un formulaire de
+  demande justifiant un usage recherche/non-profit — non applicable à ce
+  projet (hobby personnel), le fournisseur oriente explicitement ce cas vers
+  son tier payant "Hobbyist". Écarté pour raison budgétaire, pas technique.
+- [x] Giant Bomb (piste alternative testée) : API gratuite en théorie
+  (inscription + clé), avec une ressource `person` et des champs `people`/
+  `first_appearance_people` sur `game`. **Bloqué en pratique** : le domaine
+  est protégé par Cloudflare bot-management, qui renvoie soit un challenge JS
+  (`/api/games/`) soit un faux 404 généré par Cloudflare
+  (`cf-mitigated: challenge` confirmé sur `/api/search/`) pour toute requête
+  serveur-à-serveur, même avec une clé API valide. Testé en direct le
+  2026-07-04, échec confirmé — pas de contournement tenté (évasion anti-bot
+  hors périmètre).
 
 ## 10. Lacunes identifiées
 
@@ -233,7 +238,3 @@ une API sans vérifier) :
 - [ ] **Modélisation `game_companies.role` non tranchée** (§4) : 4 booléens
   IGDB cumulables (`developer`/`publisher`/`porting`/`supporting`) vs un rôle
   unique par ligne côté modèle cible — voir §9.
-- [ ] **Crédits nominatifs (`people`/`game_credits`) non implémentés** —
-  extension de périmètre actée le 2026-07-04, dépend de la vérification
-  MobyGames/IGDB non faite (§9). Ni la source d'autorité ni la liste de rôles
-  ne sont tranchées.
