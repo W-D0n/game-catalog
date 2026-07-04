@@ -17,3 +17,10 @@ export async function savePlatforms(game: Game, gameId: bigint): Promise<void> {
     `;
   }
 }
+
+export async function countPlatforms(): Promise<number> {
+  const [row] = await db<{ count: string }[]>`
+    SELECT COUNT(*) AS count FROM platforms
+  `;
+  return Number(row?.count ?? 0);
+}

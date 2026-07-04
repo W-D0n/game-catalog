@@ -14,3 +14,14 @@ export async function saveLastPage(provider: string, page: number): Promise<void
     ON CONFLICT (provider) DO UPDATE SET last_page = EXCLUDED.last_page
   `;
 }
+
+export interface ImportState {
+  provider: string;
+  lastPage: number;
+}
+
+export async function getAllImportStates(): Promise<ImportState[]> {
+  return db<ImportState[]>`
+    SELECT provider, last_page AS "lastPage" FROM import_state ORDER BY provider
+  `;
+}

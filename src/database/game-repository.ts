@@ -18,3 +18,29 @@ export async function saveGame(game: Game): Promise<bigint> {
 
   return row.id;
 }
+
+/** Tous les jeux d'une source, plateformes incluses (jointure game_platforms). */
+export async function getGamesBySource(source: string): Promise<Game[]> {
+  return db<Game[]>`
+    SELECT
+      g.source,
+      g.source_id AS "sourceId",
+      g.title,
+      g.release_year AS "releaseYear",
+      g.slug,
+      COALESCE(array_agg(p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS platforms
+    FROM games g
+    LEFT JOIN game_platforms gp ON gp.game_id = g.id
+    LEFT JOIN platforms p ON p.id = gp.platform_id
+    WHERE g.source = ${source}
+    GROUP BY g.id
+    ORDER BY g.title
+  `;
+}
+
+export async function countGames(): Promise<number> {
+  const [row] = await db<{ count: string }[]>`
+    SELECT COUNT(*) AS count FROM games
+  `;
+  return Number(row?.count ?? 0);
+}
