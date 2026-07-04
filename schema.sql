@@ -42,6 +42,17 @@ CREATE TABLE game_companies (
     PRIMARY KEY (canonical_id, company_id)
 );
 
+CREATE TABLE genres (
+    id BIGSERIAL PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE canonical_game_genres (
+    canonical_id BIGINT NOT NULL REFERENCES canonical_games(id) ON DELETE CASCADE,
+    genre_id BIGINT NOT NULL REFERENCES genres(id) ON DELETE CASCADE,
+    PRIMARY KEY (canonical_id, genre_id)
+);
+
 CREATE TABLE platforms (
     id BIGSERIAL PRIMARY KEY,
     name TEXT UNIQUE NOT NULL

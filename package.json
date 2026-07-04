@@ -13,6 +13,7 @@
     "import": "bun run src/index.ts",
     "monitor": "bun run src/services/monitor.ts",
     "enrich-rawg-library": "bun run src/enrich-rawg-library.ts",
+    "build-canonical": "bun run src/build-canonical-projection.ts",
     "test": "bun test"
   },
   "dependencies": {

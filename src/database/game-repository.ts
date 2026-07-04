@@ -70,3 +70,47 @@ export async function getGameIdentitiesBySource(source: string): Promise<GameIde
   `;
   return rows.map((row) => ({ id: BigInt(row.id), sourceId: row.sourceId, title: row.title }));
 }
+
+export interface MatchingGame {
+  id: bigint;
+  source: string;
+  sourceId: string;
+  title: string;
+  releaseYear: number | null;
+  platforms: string[];
+  rawMetadata?: SourceGameMetadata;
+}
+
+/** Toutes les sources, avec plateformes et métadonnées — entrée du matching multi-sources. */
+export async function getAllGamesForMatching(): Promise<MatchingGame[]> {
+  const rows = await db<
+    {
+      id: string;
+      source: string;
+      sourceId: string;
+      title: string;
+      releaseYear: number | null;
+      rawMetadata: string | null;
+      platforms: string[];
+    }[]
+  >`
+    SELECT
+      g.id,
+      g.source,
+      g.source_id AS "sourceId",
+      g.title,
+      g.release_year AS "releaseYear",
+      g.raw_metadata AS "rawMetadata",
+      COALESCE(array_agg(p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS platforms
+    FROM games g
+    LEFT JOIN game_platforms gp ON gp.game_id = g.id
+    LEFT JOIN platforms p ON p.id = gp.platform_id
+    GROUP BY g.id
+  `;
+
+  return rows.map((row) => ({
+    ...row,
+    id: BigInt(row.id),
+    rawMetadata: row.rawMetadata ? (JSON.parse(row.rawMetadata) as SourceGameMetadata) : undefined,
+  }));
+}
