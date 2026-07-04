@@ -83,9 +83,10 @@ game_relationships           -- le graphe
 
 companies                    -- studios / éditeurs
   id, name
-game_companies
+game_companies                -- une ligne par (canonical_id, company_id)
   canonical_id, company_id,
-  role ∈ (developer, publisher, porting, supporting)
+  is_developer BOOLEAN, is_publisher BOOLEAN,
+  is_porting BOOLEAN, is_supporting BOOLEAN
 ```
 
 > **Crédits nominatifs (`people`/`game_credits`) — abandonné, pas de table
@@ -98,13 +99,13 @@ game_companies
 
 > ⚠️ **Corrections post-vérification live (§9)** :
 > - `release_status` ci-dessus doit provenir de `game_status` IGDB (pas `status`, déprécié) — voir §6.
-> - `game_companies.role` suppose un rôle unique par ligne. Le modèle IGDB réel
->   (`involved_companies`) expose 4 booléens indépendants et cumulables
->   (`developer`, `publisher`, `porting`, `supporting`) — une société peut être
->   développeur ET éditeur sur la même ligne. **Décision à prendre avant
->   implémentation** : soit `game_companies` stocke les 4 booléens tels quels,
->   soit on éclate une ligne IGDB en plusieurs lignes `game_companies` (une par
->   rôle vrai). Non tranché.
+> - `game_companies` : **tranché le 2026-07-04**. Le modèle IGDB réel
+>   (`involved_companies`) expose 4 booléens indépendants et cumulables — une
+>   société peut être développeur ET éditeur sur la même ligne. Le modèle
+>   cible stocke ces 4 booléens tels quels (`is_developer`, `is_publisher`,
+>   `is_porting`, `is_supporting`) plutôt que d'éclater en plusieurs lignes par
+>   rôle : reflète directement la structure source sans transformation avec
+>   perte d'info, requêtes simples (`WHERE is_developer`).
 
 ## 5. Algorithme de matching
 
@@ -235,6 +236,3 @@ une API sans vérifier) :
 - [ ] **Champs source `category`/`status` à corriger** (§4, §6) : remplacer par
   `game_type`/`game_status` (lookups par id) suite à la vérification live du
   2026-07-04 — voir §9.
-- [ ] **Modélisation `game_companies.role` non tranchée** (§4) : 4 booléens
-  IGDB cumulables (`developer`/`publisher`/`porting`/`supporting`) vs un rôle
-  unique par ligne côté modèle cible — voir §9.
