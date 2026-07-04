@@ -118,17 +118,43 @@ game_companies                -- une ligne par (canonical_id, company_id)
 **Étape 2 — Blocking**
 - Clé = titre normalisé + année **±1** (les sources se contredisent souvent d'un an)
 - Tolérance élargie pour les jeux flaggés `early_access`
+- ⚠️ **Garde-fou obligatoire (trouvé en calibrage, 2026-07-04)** : si le titre
+  normalisé fait moins de **3 caractères**, ne pas l'utiliser comme clé de
+  blocking. Des titres comme `"!!!"` normalisent tous vers `""` et
+  collisionnent en masse entre eux sans rapport (741 321 collisions parasites
+  sur 942 825 mesurées avant ce garde-fou — 79% de bruit pur). En dessous du
+  seuil : traiter comme `pending_review` systématique, jamais de blocking par
+  titre seul.
 
 **Étape 3 — Scoring multi-signaux dans un bloc**
 - titre normalisé exact → confiance haute
-- sinon ratio fuzzy (Jaro-Winkler ou token-set) > seuil → candidat
+- sinon ratio fuzzy (Jaro-Winkler ou token-set) > seuil → candidat — **non
+  implémenté en v1** (voir §10, différé)
 - année à ±1 → bonus
-- recouvrement de plateformes (Jaccard sur les sets) → bonus fort (meilleur désambiguïsateur)
+- recouvrement de plateformes (Jaccard sur les sets) → bonus fort (meilleur
+  désambiguïsateur) — **nécessite `normalizePlatformName`**
+  (`src/normalizers/platform-normalizer.ts`, ajouté 2026-07-04) : RAWG et IGDB
+  nomment leurs plateformes différemment (`"PC"` vs `"PC (Microsoft
+  Windows)"`, `"Commodore / Amiga"` regroupé côté RAWG vs 7 entrées séparées
+  côté IGDB) — sans cette normalisation, le Jaccard sur les chaînes brutes est
+  cassé (voir mesure ci-dessous).
 
-**Étape 4 — Décision à 3 bandes**
-- score > seuil haut → merge auto
-- bande intermédiaire → `pending_review`
-- score < seuil bas → œuvres distinctes
+**Étape 4 — Décision à 3 bandes — seuils calibrés le 2026-07-04**
+
+Calibrage effectué sur les collisions réelles RAWG×IGDB en base (799 819
+jeux RAWG × 367 307 jeux IGDB, 199 872 collisions par titre normalisé exact
+après exclusion des clés dégénérées) :
+
+| Combinaison de signaux | Volume mesuré | Décision |
+|---|---|---|
+| Titre exact + année exacte ou ±1 + overlap plateforme (normalisé) > 0 | 118 124 | **merge auto** |
+| Titre exact + (overlap = 0 **ou** année absente d'un côté) | 46 705 | `pending_review` |
+| Titre exact + écart d'année > 1 an | 37 584 | `pending_review` (mélange remakes légitimes et collisions de titre générique du type `"chess"`, indiscernable sans signal supplémentaire) |
+
+Avant correction du mapping de plateformes, le bucket "overlap = 0" était
+gonflé à tort (81 869 au lieu de 4 838 sur le sous-cas année-exacte) à cause
+du mismatch de vocabulaire — la normalisation des plateformes est donc une
+dépendance dure de ce calibrage, pas une amélioration optionnelle.
 
 **Étape 5 — Résolution de conflit (projection canonique)**
 - précédence **par champ**, pas par source globale
@@ -227,8 +253,19 @@ une API sans vérifier) :
 
 ## 10. Lacunes identifiées
 
-- [ ] Seuils de scoring (étape 3-4) non chiffrés — **bloquant pour l'implémentation**,
-  se calibrent sur de vraies collisions RAWG×IGDB.
+- [x] **Seuils de scoring (étape 3-4) calibrés le 2026-07-04** sur les vraies
+  collisions RAWG×IGDB — voir §5 étape 4 pour les chiffres et la méthode.
+- [ ] **Matching fuzzy non implémenté** : seul le titre normalisé exact est
+  géré en v1 (étape 3). Les quasi-doublons avec légère divergence de titre
+  entre sources ne sont pas détectés — nécessiterait une technique dédiée
+  (similarité trigram, ex. extension Postgres `pg_trgm`), non couverte par ce
+  calibrage. Ces cas restent des `games` non liés (pas de faux négatif fatal,
+  juste une couverture incomplète du dédoublonnage).
+- [ ] `src/normalizers/platform-normalizer.ts` est une curation manuelle sur
+  les plateformes réellement présentes dans le catalogue au 2026-07-04, pas
+  une couverture exhaustive de toutes les plateformes IGDB possibles — à
+  compléter si de nouvelles plateformes apparaissent côté RAWG ou IGDB et
+  que le recouvrement se dégrade silencieusement.
 - [ ] Stratégie de re-matching incrémental (un canonical existant qui doit se
   re-scinder ou fusionner après nouvelle donnée) non spécifiée.
 - [ ] Détection des éditions : la liste de suffixes (étape 1) est un point de
