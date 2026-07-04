@@ -95,3 +95,16 @@ export function normalizePlatformName(name: string): string {
   }
   return IGDB_TO_RAWG_PLATFORM[name] ?? name;
 }
+
+/** Indice de Jaccard entre deux listes de plateformes, après normalisation vers l'espace canonique. */
+export function computePlatformOverlap(platformsA: string[], platformsB: string[]): number {
+  const setA = new Set(platformsA.map(normalizePlatformName));
+  const setB = new Set(platformsB.map(normalizePlatformName));
+
+  if (setA.size === 0 && setB.size === 0) return 0;
+
+  const intersectionSize = [...setA].filter((platform) => setB.has(platform)).length;
+  const unionSize = new Set([...setA, ...setB]).size;
+
+  return intersectionSize / unionSize;
+}
