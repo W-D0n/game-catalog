@@ -6,12 +6,46 @@ const PAGE_SIZE = 500;
 const DELAY_MS = 500;
 const MAX_RETRIES = 5;
 
+const IGDB_FIELDS = [
+  "id",
+  "slug",
+  "name",
+  "first_release_date",
+  "platforms.name",
+  "genres.name",
+  "involved_companies.company.name",
+  "involved_companies.developer",
+  "involved_companies.publisher",
+  "involved_companies.porting",
+  "involved_companies.supporting",
+  "game_type",
+  "game_status",
+  "parent_game",
+  "version_parent",
+].join(",");
+
 const IgdbGameSchema = z.object({
   id: z.number(),
   slug: z.string(),
   name: z.string(),
   first_release_date: z.number().optional(),
   platforms: z.array(z.object({ name: z.string() })).optional(),
+  genres: z.array(z.object({ name: z.string() })).optional(),
+  involved_companies: z
+    .array(
+      z.object({
+        company: z.object({ name: z.string() }).optional(),
+        developer: z.boolean().optional(),
+        publisher: z.boolean().optional(),
+        porting: z.boolean().optional(),
+        supporting: z.boolean().optional(),
+      })
+    )
+    .optional(),
+  game_type: z.number().nullable().optional(),
+  game_status: z.number().nullable().optional(),
+  parent_game: z.number().nullable().optional(),
+  version_parent: z.number().nullable().optional(),
 });
 
 const IgdbResponseSchema = z.array(IgdbGameSchema);
@@ -58,7 +92,7 @@ async function fetchPageWithRetry(
           Authorization: `Bearer ${token}`,
           "Content-Type": "text/plain",
         },
-        body: `fields id,slug,name,first_release_date,platforms.name; sort id asc; limit ${PAGE_SIZE}; offset ${offset};`,
+        body: `fields ${IGDB_FIELDS}; sort id asc; limit ${PAGE_SIZE}; offset ${offset};`,
       });
 
       if (response.ok) {
@@ -131,6 +165,22 @@ export class IgdbProvider implements GameProvider {
         : null,
       platforms: game.platforms?.map((p) => p.name) ?? [],
       slug: game.slug,
+      rawMetadata: {
+        genres: game.genres?.map((g) => g.name),
+        companies: game.involved_companies
+          ?.filter((ic) => ic.company !== undefined)
+          .map((ic) => ({
+            name: ic.company!.name,
+            isDeveloper: ic.developer ?? false,
+            isPublisher: ic.publisher ?? false,
+            isPorting: ic.porting ?? false,
+            isSupporting: ic.supporting ?? false,
+          })),
+        gameType: game.game_type ?? null,
+        gameStatus: game.game_status ?? null,
+        parentGame: game.parent_game ?? null,
+        versionParent: game.version_parent ?? null,
+      },
     }));
   }
 }

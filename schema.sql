@@ -5,6 +5,7 @@ CREATE TABLE games (
     title TEXT NOT NULL,
     release_year INTEGER,
     slug TEXT,
+    raw_metadata JSONB,
     created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(source, source_id)
 );

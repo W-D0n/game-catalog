@@ -52,8 +52,79 @@ describe("IgdbProvider.fetchPage", () => {
         releaseYear: 2015,
         platforms: ["PC (Microsoft Windows)"],
         slug: "the-witcher-3-wild-hunt",
+        rawMetadata: {
+          genres: undefined,
+          companies: undefined,
+          gameType: null,
+          gameStatus: null,
+          parentGame: null,
+          versionParent: null,
+        },
       },
     ]);
+  });
+
+  test("[fetchPage] mappe genres, studios (rôles cumulables) et relations en rawMetadata", async () => {
+    global.fetch = mockFetchSequence([
+      tokenResponse(),
+      new Response(
+        JSON.stringify([
+          {
+            id: 1942,
+            slug: "the-witcher-3-wild-hunt",
+            name: "The Witcher 3: Wild Hunt",
+            genres: [{ name: "RPG" }, { name: "Adventure" }],
+            involved_companies: [
+              {
+                company: { name: "CD Projekt Red" },
+                developer: true,
+                publisher: true,
+                porting: false,
+                supporting: false,
+              },
+              {
+                company: { name: "GOG" },
+                developer: false,
+                publisher: false,
+                porting: false,
+                supporting: true,
+              },
+            ],
+            game_type: 0,
+            game_status: 0,
+            parent_game: 100,
+            version_parent: null,
+          },
+        ]),
+        { status: 200 }
+      ),
+    ]);
+
+    const games = await new IgdbProvider().fetchPage(1);
+
+    expect(games[0]?.rawMetadata).toEqual({
+      genres: ["RPG", "Adventure"],
+      companies: [
+        {
+          name: "CD Projekt Red",
+          isDeveloper: true,
+          isPublisher: true,
+          isPorting: false,
+          isSupporting: false,
+        },
+        {
+          name: "GOG",
+          isDeveloper: false,
+          isPublisher: false,
+          isPorting: false,
+          isSupporting: true,
+        },
+      ],
+      gameType: 0,
+      gameStatus: 0,
+      parentGame: 100,
+      versionParent: null,
+    });
   });
 
   test("[fetchPage] jeu sans first_release_date retourne releaseYear null", async () => {

@@ -53,6 +53,56 @@ describe("saveGame", () => {
     expect(id).toBeGreaterThan(0n);
   });
 
+  test("[saveGame] rawMetadata absent n'empêche pas la sauvegarde", async () => {
+    const id = await saveGame(buildGame({ sourceId: "1000" }));
+
+    expect(id).toBeGreaterThan(0n);
+  });
+
+  test("[saveGame] rawMetadata persisté et relu tel quel", async () => {
+    await saveGame(
+      buildGame({
+        source: "igdb",
+        sourceId: "1942",
+        rawMetadata: {
+          genres: ["RPG", "Adventure"],
+          companies: [
+            {
+              name: "CD Projekt Red",
+              isDeveloper: true,
+              isPublisher: true,
+              isPorting: false,
+              isSupporting: false,
+            },
+          ],
+          gameType: 0,
+          gameStatus: 0,
+          parentGame: null,
+          versionParent: null,
+        },
+      })
+    );
+
+    const [game] = await getGamesBySource("igdb");
+
+    expect(game?.rawMetadata).toEqual({
+      genres: ["RPG", "Adventure"],
+      companies: [
+        {
+          name: "CD Projekt Red",
+          isDeveloper: true,
+          isPublisher: true,
+          isPorting: false,
+          isSupporting: false,
+        },
+      ],
+      gameType: 0,
+      gameStatus: 0,
+      parentGame: null,
+      versionParent: null,
+    });
+  });
+
   test("[saveGame] même titre, sources différentes ne collisionnent pas", async () => {
     await saveGame(buildGame({ source: "rawg", sourceId: "1" }));
     await saveGame(buildGame({ source: "igdb", sourceId: "1" }));

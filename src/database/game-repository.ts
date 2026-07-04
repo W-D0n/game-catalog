@@ -1,12 +1,14 @@
 import { db } from "./db";
-import type { Game } from "../types/game";
+import type { Game, SourceGameMetadata } from "../types/game";
 
 /** Upsert un jeu et retourne son id, qu'il soit inséré ou mis à jour. */
 export async function saveGame(game: Game): Promise<bigint> {
+  const rawMetadata = game.rawMetadata ? JSON.stringify(game.rawMetadata) : null;
+
   const [row] = await db<{ id: string }[]>`
-    INSERT INTO games (source, source_id, title, release_year, slug)
-    VALUES (${game.source}, ${game.sourceId}, ${game.title}, ${game.releaseYear ?? null}, ${game.slug ?? null})
-    ON CONFLICT (source, source_id) DO UPDATE SET title = EXCLUDED.title
+    INSERT INTO games (source, source_id, title, release_year, slug, raw_metadata)
+    VALUES (${game.source}, ${game.sourceId}, ${game.title}, ${game.releaseYear ?? null}, ${game.slug ?? null}, ${rawMetadata}::jsonb)
+    ON CONFLICT (source, source_id) DO UPDATE SET title = EXCLUDED.title, raw_metadata = EXCLUDED.raw_metadata
     RETURNING id
   `;
 
@@ -21,13 +23,14 @@ export async function saveGame(game: Game): Promise<bigint> {
 
 /** Tous les jeux d'une source, plateformes incluses (jointure game_platforms). */
 export async function getGamesBySource(source: string): Promise<Game[]> {
-  return db<Game[]>`
+  const rows = await db<(Omit<Game, "rawMetadata"> & { rawMetadata: string | null })[]>`
     SELECT
       g.source,
       g.source_id AS "sourceId",
       g.title,
       g.release_year AS "releaseYear",
       g.slug,
+      g.raw_metadata AS "rawMetadata",
       COALESCE(array_agg(p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS platforms
     FROM games g
     LEFT JOIN game_platforms gp ON gp.game_id = g.id
@@ -36,6 +39,13 @@ export async function getGamesBySource(source: string): Promise<Game[]> {
     GROUP BY g.id
     ORDER BY g.title
   `;
+
+  return rows.map((row) => ({
+    ...row,
+    rawMetadata: row.rawMetadata
+      ? (JSON.parse(row.rawMetadata) as SourceGameMetadata)
+      : undefined,
+  }));
 }
 
 export async function countGames(): Promise<number> {
