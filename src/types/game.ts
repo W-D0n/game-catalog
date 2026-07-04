@@ -5,5 +5,4 @@ export interface Game {
   releaseYear: number | null;
   platforms: string[];
   slug?: string | null;
-  rawData?: unknown;
 }

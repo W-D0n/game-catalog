@@ -1,9 +1,27 @@
+import { z } from "zod";
 import type { Game } from "../../types/game";
 import { ProviderError, ProviderQuotaError, type GameProvider } from "../provider";
 
 const PAGE_SIZE = 40;
 const DELAY_MS = 500;
 const MAX_RETRIES = 5;
+
+const RawgGameSchema = z.object({
+  id: z.number(),
+  slug: z.string(),
+  name: z.string(),
+  released: z.string().nullable(),
+  platforms: z
+    .array(z.object({ platform: z.object({ name: z.string() }) }))
+    .optional(),
+});
+
+const RawgResponseSchema = z.object({
+  next: z.string().nullable(),
+  results: z.array(RawgGameSchema),
+});
+
+type RawgResponse = z.infer<typeof RawgResponseSchema>;
 
 /** Un statut transitoire vaut la peine d'être retenté ; un 4xx (hors 429) non. */
 export function isRetriableStatus(status: number): boolean {
@@ -23,7 +41,17 @@ async function fetchPageWithRetry(url: URL, page: number): Promise<RawgResponse>
       const response = await fetch(url);
 
       if (response.ok) {
-        return (await response.json()) as RawgResponse;
+        const body: unknown = await response.json();
+        const parsed = RawgResponseSchema.safeParse(body);
+
+        if (!parsed.success) {
+          throw new ProviderError(
+            "rawg",
+            `RAWG page ${page} : réponse invalide (${parsed.error.message})`
+          );
+        }
+
+        return parsed.data;
       }
 
       if (response.status === 401 || response.status === 403) {
@@ -57,23 +85,6 @@ async function fetchPageWithRetry(url: URL, page: number): Promise<RawgResponse>
   );
 }
 
-interface RawgGame {
-  id: number;
-  slug: string;
-  name: string;
-  released: string | null;
-  platforms?: {
-    platform: {
-      name: string;
-    };
-  }[];
-}
-
-interface RawgResponse {
-  next: string | null;
-  results: RawgGame[];
-}
-
 export class RawgProvider implements GameProvider {
   readonly name = "rawg";
 
@@ -98,7 +109,6 @@ export class RawgProvider implements GameProvider {
       releaseYear: game.released ? Number(game.released.slice(0, 4)) : null,
       platforms: game.platforms?.map((p) => p.platform.name) ?? [],
       slug: game.slug,
-      rawData: game,
     }));
   }
 }
