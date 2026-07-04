@@ -1,9 +1,14 @@
 # Spec — Multi-source matching & ontologie de jeux
 
-> **Statut : CONCEPTION.** Implémentation différée jusqu'à ce qu'une 2ᵉ source
-> (IGDB) coule réellement. Les seuils de matching sont empiriques et se
-> calibrent sur de vraies collisions inter-sources — les coder avant serait
-> hardcoder des nombres invérifiables sur des données inexistantes.
+> **Statut : IMPLÉMENTÉ** (2026-07-05, 5 sessions). Code écrit et testé
+> (schéma §4, algorithme §5, projection canonique §6) contre les vraies
+> données RAWG×IGDB. **Pas encore ré-exécuté avec succès en production** au
+> catalogue complet : le premier run a révélé un débit trop lent (~50
+> groupes/s), et en corrigeant ça un incident de données (`TRUNCATE ...
+> CASCADE`, voir mémoire projet) a détruit `games` — RAWG irrécupérable avant
+> le 2026-08-01, IGDB en reconstruction. L'écriture est maintenant batchée et
+> validée à l'échelle sur la base de test (30k jeux synthétiques, 4s) — reste
+> à relancer sur les vraies données une fois reconstituées.
 
 ## 1. Problème
 
@@ -68,11 +73,11 @@ avec provenance par champ**.
 - Quand on calcule le blocking
 - Alors la tolérance d'année est élargie pour les jeux flaggés EA, et le match reste possible.
 
-## 4. Modèle de données (cible — NON implémenté)
+## 4. Modèle de données — **implémenté** (2026-07-05)
 
 ```
 games  (existant)            -- source games, 1 ligne par (source, source_id)
-  + canonical_id BIGINT NULL -- FK ajoutée vers canonical_games
+  + canonical_id BIGINT NULL -- FK ajoutée vers canonical_games (ON DELETE SET NULL)
 
 canonical_games              -- l'œuvre dédupliquée
   id, title, release_year, release_status, created_at
@@ -87,7 +92,17 @@ game_companies                -- une ligne par (canonical_id, company_id)
   canonical_id, company_id,
   is_developer BOOLEAN, is_publisher BOOLEAN,
   is_porting BOOLEAN, is_supporting BOOLEAN
+
+genres                       -- ajouté 2026-07-05, oublié à la Session 2
+  id, name
+canonical_game_genres
+  canonical_id, genre_id
 ```
+
+> **Précédence effective observée** : `companies`/`genres` ne sont alimentés
+> que par IGDB — RAWG ne fournit aucune de ces deux données par jeu (vérifié
+> §9 pipeline RAWG). Ce n'est donc pas un vrai fallback multi-source pour
+> l'instant, juste IGDB seul producteur.
 
 > **Crédits nominatifs (`people`/`game_credits`) — abandonné, pas de table
 > cible.** Envisagé le 2026-07-04 pour couvrir les personnes physiques
