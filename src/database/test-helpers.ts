@@ -1,6 +1,6 @@
 import { db } from "./db";
 
-/** Vide les 4 tables entre les tests, sur la base de test isolée (TEST_DATABASE_URL). */
+/** Vide toutes les tables entre les tests, sur la base de test isolée (TEST_DATABASE_URL). */
 export async function resetDatabase(): Promise<void> {
   if (process.env.NODE_ENV !== "test") {
     throw new Error(
@@ -8,5 +8,11 @@ export async function resetDatabase(): Promise<void> {
     );
   }
 
-  await db`TRUNCATE game_platforms, games, platforms, import_state, steam_library_games, rawg_game_credits RESTART IDENTITY CASCADE`;
+  await db`
+    TRUNCATE
+      game_platforms, games, platforms, import_state,
+      steam_library_games, rawg_game_credits,
+      game_companies, companies, game_relationships, canonical_games
+    RESTART IDENTITY CASCADE
+  `;
 }
