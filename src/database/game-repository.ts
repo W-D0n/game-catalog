@@ -44,3 +44,19 @@ export async function countGames(): Promise<number> {
   `;
   return Number(row?.count ?? 0);
 }
+
+export interface GameIdentity {
+  id: bigint;
+  sourceId: string;
+  title: string;
+}
+
+/** Identités internes (id, sourceId, title) d'une source — pour lier des données annexes (ex: crédits). */
+export async function getGameIdentitiesBySource(source: string): Promise<GameIdentity[]> {
+  const rows = await db<{ id: string; sourceId: string; title: string }[]>`
+    SELECT id, source_id AS "sourceId", title
+    FROM games
+    WHERE source = ${source}
+  `;
+  return rows.map((row) => ({ id: BigInt(row.id), sourceId: row.sourceId, title: row.title }));
+}

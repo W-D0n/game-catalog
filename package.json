@@ -12,6 +12,7 @@
   "scripts": {
     "import": "bun run src/index.ts",
     "monitor": "bun run src/services/monitor.ts",
+    "enrich-rawg-library": "bun run src/enrich-rawg-library.ts",
     "test": "bun test"
   },
   "dependencies": {

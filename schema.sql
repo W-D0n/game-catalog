@@ -24,3 +24,19 @@ CREATE TABLE import_state (
     provider TEXT PRIMARY KEY,
     last_page INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE steam_library_games (
+    app_id BIGINT PRIMARY KEY,
+    name TEXT NOT NULL,
+    fetched_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE rawg_game_credits (
+    id BIGSERIAL PRIMARY KEY,
+    game_id BIGINT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    rawg_person_id BIGINT NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT,
+    fetched_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE(game_id, rawg_person_id)
+);

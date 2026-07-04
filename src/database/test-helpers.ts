@@ -8,5 +8,5 @@ export async function resetDatabase(): Promise<void> {
     );
   }
 
-  await db`TRUNCATE game_platforms, games, platforms, import_state RESTART IDENTITY CASCADE`;
+  await db`TRUNCATE game_platforms, games, platforms, import_state, steam_library_games, rawg_game_credits RESTART IDENTITY CASCADE`;
 }
