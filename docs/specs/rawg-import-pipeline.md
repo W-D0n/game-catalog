@@ -96,9 +96,11 @@ Boucle d'import — **écrit** : `games`, `platforms`, `game_platforms`, `import
 
 - [x] **Quota mensuel** : plan gratuit RAWG = 20 000 requêtes/mois (~800 000 jeux/mois
   à `PAGE_SIZE=40`). Détection implémentée **par classe de statut** : 401/403 →
-  `ProviderQuotaError` → arrêt propre du service, progression préservée. Robuste quel
-  que soit le code exact renvoyé par RAWG. **Reste à confirmer** : le code HTTP précis
-  du quota épuisé (401 vs 403 vs 429) — la gestion par classe couvre les trois.
+  `ProviderQuotaError` → arrêt propre du service, progression préservée. **Code HTTP
+  confirmé en conditions réelles le 2026-07-04** : `401` avec le corps
+  `{"error": "The monthly API limit reached"}` — atteint après le backfill complet
+  (page 20062/~22500, ~802 480 jeux). La gestion par classe (401/403) reste justifiée
+  même si seul 401 a été observé.
 - [ ] **Terminaison non vérifiée en conditions réelles** : on suppose que RAWG
   renvoie `results: []` (HTTP 200) au-delà de la dernière page. Si c'est une
   erreur HTTP à la place, la fin de catalogue déclenchera un échec persistant
