@@ -3,7 +3,7 @@ import type { Game } from "../types/game";
 
 /** Upsert un jeu et retourne son id, qu'il soit inséré ou mis à jour. */
 export async function saveGame(game: Game): Promise<bigint> {
-  const [row] = await db<{ id: bigint }[]>`
+  const [row] = await db<{ id: string }[]>`
     INSERT INTO games (source, source_id, title, release_year, slug)
     VALUES (${game.source}, ${game.sourceId}, ${game.title}, ${game.releaseYear ?? null}, ${game.slug ?? null})
     ON CONFLICT (source, source_id) DO UPDATE SET title = EXCLUDED.title
@@ -16,7 +16,7 @@ export async function saveGame(game: Game): Promise<bigint> {
     );
   }
 
-  return row.id;
+  return BigInt(row.id);
 }
 
 /** Tous les jeux d'une source, plateformes incluses (jointure game_platforms). */

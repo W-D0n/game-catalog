@@ -3,6 +3,9 @@ import { SQL } from "bun";
 
 config({ override: true });
 
-export const db = new SQL({
-  url: process.env.DATABASE_URL
-});
+const url =
+  process.env.NODE_ENV === "test"
+    ? process.env.TEST_DATABASE_URL
+    : process.env.DATABASE_URL;
+
+export const db = new SQL({ url });

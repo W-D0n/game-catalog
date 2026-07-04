@@ -3,7 +3,7 @@ import type { Game } from "../types/game";
 
 export async function savePlatforms(game: Game, gameId: bigint): Promise<void> {
   for (const platformName of game.platforms) {
-    const [platform] = await db<{ id: bigint }[]>`
+    const [platform] = await db<{ id: string }[]>`
       INSERT INTO platforms (name)
       VALUES (${platformName})
       ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
