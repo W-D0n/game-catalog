@@ -2,16 +2,17 @@ import { fetchSteamLibrary } from "../providers/steam/steam-library-client";
 import { saveLibraryGame, getLibraryGames } from "../database/steam-library-repository";
 import { getGameIdentitiesBySource } from "../database/game-repository";
 import { fetchDevelopmentTeam } from "../providers/rawg/rawg-development-team-client";
-import { saveGameCredits } from "../database/rawg-credits-repository";
+import { saveGameCredits, getGameIdsWithCredits } from "../database/rawg-credits-repository";
 import { ProviderQuotaError } from "../providers/provider";
-import { normalizeTitle } from "../normalizers/game-normalizer";
+import { normalizeMatchingTitle } from "../normalizers/matching-title-normalizer";
 
 const DELAY_MS = 500;
 
 /**
  * Enrichit les jeux RAWG de la bibliothèque Steam avec leurs crédits
  * individuels (development-team). Déclenchement manuel, volume limité à la
- * taille de la bibliothèque — pas tout le catalogue RAWG.
+ * taille de la bibliothèque — pas tout le catalogue RAWG. Reprend là où un
+ * run précédent s'est arrêté (quota) sans re-traiter les jeux déjà enrichis.
  */
 export async function enrichRawgLibrary(): Promise<void> {
   const steamGames = await fetchSteamLibrary();
@@ -22,15 +23,22 @@ export async function enrichRawgLibrary(): Promise<void> {
   }
 
   const libraryGames = await getLibraryGames();
-  const libraryTitles = new Set(libraryGames.map((g) => normalizeTitle(g.name)));
+  const libraryTitles = new Set(libraryGames.map((g) => normalizeMatchingTitle(g.name)));
 
   const rawgGames = await getGameIdentitiesBySource("rawg");
-  const matches = rawgGames.filter((game) => libraryTitles.has(normalizeTitle(game.title)));
+  const matches = rawgGames.filter((game) =>
+    libraryTitles.has(normalizeMatchingTitle(game.title))
+  );
 
-  console.log(`${matches.length} jeux RAWG correspondent à la bibliothèque Steam.`);
+  const alreadyEnriched = await getGameIdsWithCredits();
+  const remaining = matches.filter((game) => !alreadyEnriched.has(game.id));
 
-  for (const [index, game] of matches.entries()) {
-    console.log(`[${index + 1}/${matches.length}] ${game.title} (rawg:${game.sourceId})...`);
+  console.log(
+    `${matches.length} jeux RAWG correspondent à la bibliothèque Steam, ${remaining.length} restent à enrichir.`
+  );
+
+  for (const [index, game] of remaining.entries()) {
+    console.log(`[${index + 1}/${remaining.length}] ${game.title} (rawg:${game.sourceId})...`);
 
     await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
 

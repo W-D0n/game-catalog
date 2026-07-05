@@ -15,6 +15,14 @@ export async function saveGameCredits(
   }
 }
 
+/** Ids des jeux ayant déjà des crédits sauvegardés — pour reprendre un enrichissement interrompu sans regaspiller le quota. */
+export async function getGameIdsWithCredits(): Promise<Set<bigint>> {
+  const rows = await db<{ game_id: string }[]>`
+    SELECT DISTINCT game_id FROM rawg_game_credits
+  `;
+  return new Set(rows.map((row) => BigInt(row.game_id)));
+}
+
 export async function getGameCredits(gameId: bigint): Promise<RawgPerson[]> {
   const rows = await db<{ rawg_person_id: string; name: string; slug: string | null }[]>`
     SELECT rawg_person_id, name, slug FROM rawg_game_credits WHERE game_id = ${gameId} ORDER BY name
