@@ -158,6 +158,28 @@ règle existe déjà en mémoire de session — elle est dupliquée ici pour êt
 visible par quiconque lit le dépôt, pas seulement dans un contexte de
 session Claude.
 
+## 4bis. Indexation des FK — audit réel du 2026-07-05
+
+Suite à la découverte de `games.canonical_id` non indexé (§2, trouvé en
+lançant l'export en prod), un audit complet a été fait contre les vraies
+métadonnées Postgres (`pg_index`/`information_schema`, pas une relecture de
+`schema.sql`) sur toutes les colonnes FK du schéma. Révèle 4 gaps
+supplémentaires, tous du même pattern (tables de jonction, FK en seconde
+position d'une clé composite, donc invisible pour un lookup filtrant
+seulement sur cette colonne) :
+
+- `canonical_game_genres.genre_id`
+- `game_companies.company_id`
+- `game_platforms.platform_id`
+- `game_relationships.to_canonical_id`
+
+Tous corrigés (index ajoutés en prod via `CREATE INDEX CONCURRENTLY`,
+validité vérifiée via `pg_index.indisvalid`, appliqués aussi en test et dans
+`schema.sql`). **Méthode à retenir** : après tout ajout de colonne FK,
+vérifier sa couverture par une requête directe sur `pg_index`, pas en
+relisant `schema.sql` à l'œil — une relecture superficielle avait laissé
+passer ces 4 gaps une première fois.
+
 ## 5. Priorisation proposée
 
 | # | Garde-fou | Effort | Risque si absent |
