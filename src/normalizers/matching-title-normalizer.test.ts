@@ -52,4 +52,32 @@ describe("normalizeMatchingTitle", () => {
   test("[normalizeMatchingTitle] espaces multiples collassés", () => {
     expect(normalizeMatchingTitle("Half-Life    2")).toBe("half-life 2");
   });
+
+  test("[normalizeMatchingTitle] suffixe Deluxe Edition retiré (le plus fréquent en base)", () => {
+    expect(normalizeMatchingTitle("Cyberpunk 2077 - Deluxe Edition")).toBe("cyberpunk 2077");
+  });
+
+  test("[normalizeMatchingTitle] suffixe Collector's Edition retiré", () => {
+    expect(normalizeMatchingTitle("Persona 5 Royal: Collector's Edition")).toBe(
+      "persona 5 royal"
+    );
+  });
+
+  test("[normalizeMatchingTitle] suffixe Ultimate Edition retiré", () => {
+    expect(normalizeMatchingTitle("Street Fighter 6 Ultimate Edition")).toBe("street fighter 6");
+  });
+
+  test("[normalizeMatchingTitle] Game of the Year sans le mot Edition retiré", () => {
+    expect(normalizeMatchingTitle("Elden Ring: Game of the Year")).toBe("elden ring");
+  });
+
+  test("[normalizeMatchingTitle] suffixe Redux retiré", () => {
+    expect(normalizeMatchingTitle("Deus Ex: Human Revolution - Director's Cut Redux")).toBe(
+      "deus ex: human revolution"
+    );
+  });
+
+  test("[normalizeMatchingTitle] remake n'est jamais traité comme une édition", () => {
+    expect(normalizeMatchingTitle("Resident Evil Remake")).toBe("resident evil remake");
+  });
 });

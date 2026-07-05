@@ -131,17 +131,32 @@ toute ponctuation). `normalizeMatchingTitle` :
 - lowercase, trim, NFKD + suppression diacritiques, suppression ™ ®
   (dans cet ordre — ™/® doivent être supprimés **avant** `normalize("NFKD")`,
   sinon NFKD les décompose en lettres "TM"/"R" et le strip ne matche plus rien)
-- strip des suffixes d'édition : `Game of the Year Edition`, `Definitive Edition`, `Remastered`, `GOTY`, `Director's Cut`, `Complete Edition`
+- strip des suffixes d'édition (liste élargie le 2026-07-05 par comptage
+  empirique, voir §10) : `Game of the Year Edition`, `Game of the Year`,
+  `Definitive Edition`, `Director's Cut`, `Complete Edition`,
+  `Deluxe Edition`, `Digital Deluxe`, `Collector's Edition`,
+  `Ultimate Edition`, `Special Edition`, `Gold Edition`,
+  `Anniversary Edition`, `Extended Edition`, `Enhanced Edition`,
+  `Legendary Edition`, `Standard Edition`, `HD Edition`, `Remastered`,
+  `Redux`, `GOTY` — appliqués en boucle jusqu'à point fixe (suffixes
+  empilables, ex. `"Director's Cut Redux"`)
 - collapse des espaces
 - **conserve la ponctuation** (contrairement à `normalizeTitle`) et **interdit**
   de stripper le sous-titre après `:` (`Final Fantasy VII` ≠ `Final Fantasy VII: Remake`)
 
 **Étape 2 — Blocking** — **implémenté** (`src/matching/blocking.ts`)
 - Clé = titre normalisé exact (le ±1 an s'applique à la décision, étape 4, pas au blocking lui-même)
-- Tolérance élargie pour les jeux flaggés `early_access` — **non implémenté** :
-  aucune donnée `early_access`/`game_status` résolue actuellement (`game_status`
-  IGDB n'est qu'un id brut non résolu en libellé, voir §9) ; à ajouter en
-  session 5 une fois la résolution des lookups faite.
+- Tolérance élargie pour les jeux flaggés `early_access` — **non implémenté,
+  vérifié infaisable en l'état le 2026-07-05** : `resolveGameStatus` existe
+  (§9, lookups résolus), mais `game_status` est **null pour 322 335 des
+  322 336 jeux IGDB en base** (un seul renseigné). Vérifié en direct contre
+  l'API IGDB elle-même (pas un bug d'import) : même *Baldur's Gate III*
+  (connu pour son passage par l'early access) n'a **aucun** `game_status`
+  renseigné côté IGDB — seul un spin-off annulé (*The Black Hound*) en a un
+  (`Cancelled`). Ce champ est sporadiquement peuplé par IGDB, quel que soit
+  le jeu. Implémenter une tolérance sur une donnée quasi jamais disponible
+  serait un seuil invérifiable sur données inexistantes (zéro code
+  préemptif) — différé tant que la couverture réelle ne s'améliore pas.
 - ⚠️ **Garde-fou de longueur minimale (3 caractères)** conservé en défense en
   profondeur, mais son rôle a changé depuis le calibrage du 2026-07-04 : le
   bug alors trouvé (titres ponctuation-only du type `"!!!"` s'effondrant tous
@@ -306,11 +321,26 @@ une API sans vérifier) :
   les fusionner ?) est **laissé non lié** plutôt que de fusionner à l'aveugle
   — pas de scission automatique de canonical existant non plus (non
   implémenté, cohérent avec "jamais de merge auto en cas d'incertitude").
-- [ ] **Tolérance `early_access` (étape 2) non implémentée** : nécessite la
-  résolution du lookup `game_status` IGDB (actuellement un id brut non résolu
-  en libellé dans `raw_metadata`, voir §9) — à faire en session 5.
-- [ ] Détection des éditions : la liste de suffixes (étape 1) est un point de
-  départ, pas exhaustive.
+- [x] **Tolérance `early_access` — vérifiée infaisable le 2026-07-05** :
+  `game_status` quasi jamais peuplé côté IGDB (322 335/322 336 null),
+  confirmé en direct sur l'API — voir §5 étape 2. Pas de code écrit, pas de
+  seuil inventé sans donnée.
+- [x] **Détection des éditions — liste élargie le 2026-07-05** par comptage
+  empirique sur 799 819 RAWG + 322 337 IGDB (pas une supposition) : ajout de
+  `deluxe edition` (1488 occurrences, le plus fréquent absent), `collector's
+  edition` (1395), `ultimate edition`, `digital deluxe`, `special edition`,
+  `gold edition`, `anniversary edition`, `extended edition`, `enhanced
+  edition`, `legendary edition`, `standard edition`, `hd edition`, `redux`,
+  `game of the year` (sans "edition"). **`remake` délibérément exclu** — un
+  remake est une œuvre distincte (relation `remake_of`), pas une édition.
+  Bug trouvé et corrigé en écrivant les tests : les suffixes empilés
+  (`"Director's Cut Redux"`) n'étaient retirés qu'en une passe à ordre fixe —
+  passé en boucle jusqu'à point fixe. Liste non exhaustive (le catalogue
+  RAWG évoluera avec le retour du quota), mais boucle de calibrage
+  reproductible désormais en place.
 - [ ] **Champs source `category`/`status` à corriger** (§4, §6) : remplacer par
   `game_type`/`game_status` (lookups par id) suite à la vérification live du
-  2026-07-04 — voir §9.
+  2026-07-04 — voir §9. Nuance ajoutée le 2026-07-05 : `game_status` étant
+  quasi toujours null (voir ci-dessus), `release_status` sera vide pour la
+  quasi-totalité des canonical games même une fois ce champ corrigé — limite
+  de données, pas de code.
