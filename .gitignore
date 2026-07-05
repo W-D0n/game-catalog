@@ -24,6 +24,9 @@ data/
 # Exports générés
 exports/
 
+# Config locale du croisement de bibliothèques Steam (liste de SteamID64 personnels)
+steam-players.json
+
 # logs
 logs
 *.log

@@ -95,6 +95,24 @@ CREATE TABLE steam_library_games (
     fetched_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Croisement de bibliothèques Steam multi-utilisateurs (voir
+-- docs/specs/steam-library-crossing.md). Distinct de steam_library_games
+-- (bibliothèque personnelle unique, déjà en prod) pour ne pas risquer de
+-- régression sur enrich-rawg-library.ts / export-steam-library.ts.
+CREATE TABLE steam_players (
+    steam_id64 TEXT PRIMARY KEY,
+    persona_name TEXT NOT NULL,
+    is_public BOOLEAN NOT NULL,
+    fetched_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE steam_player_games (
+    steam_id64 TEXT NOT NULL REFERENCES steam_players(steam_id64) ON DELETE CASCADE,
+    app_id BIGINT NOT NULL,
+    name TEXT NOT NULL,
+    PRIMARY KEY (steam_id64, app_id)
+);
+
 CREATE TABLE rawg_game_credits (
     id BIGSERIAL PRIMARY KEY,
     game_id BIGINT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
