@@ -19,6 +19,8 @@ CREATE TABLE games (
     UNIQUE(source, source_id)
 );
 
+CREATE INDEX idx_games_canonical_id ON games (canonical_id);
+
 CREATE TABLE game_relationships (
     id BIGSERIAL PRIMARY KEY,
     from_canonical_id BIGINT NOT NULL REFERENCES canonical_games(id) ON DELETE CASCADE,

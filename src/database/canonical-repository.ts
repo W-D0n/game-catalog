@@ -139,3 +139,90 @@ export async function saveGameRelationshipsBulk(links: RelationshipLink[]): Prom
     ON CONFLICT (from_canonical_id, to_canonical_id, type) DO NOTHING
   `;
 }
+
+export interface CanonicalGameExport {
+  id: string;
+  title: string;
+  releaseYear: number | null;
+  releaseStatus: string | null;
+  platforms: string[];
+  genres: string[];
+  companies: GameCompanyCredit[];
+  sources: { source: string; sourceId: string; title: string }[];
+  relationships: { type: RelationshipType; toId: string; toTitle: string }[];
+}
+
+/** Projection canonique complète pour export — un objet par canonical game, provenance et relations incluses. */
+export async function getCanonicalGamesForExport(): Promise<CanonicalGameExport[]> {
+  const rows = await db<
+    (Omit<CanonicalGameExport, "companies" | "sources" | "relationships"> & {
+      companies: GameCompanyCredit[] | null;
+      sources: { source: string; sourceId: string; title: string }[] | null;
+      relationships: { type: RelationshipType; toId: string; toTitle: string }[] | null;
+    })[]
+  >`
+    SELECT
+      cg.id,
+      cg.title,
+      cg.release_year AS "releaseYear",
+      cg.release_status AS "releaseStatus",
+      COALESCE(platforms.list, '{}') AS platforms,
+      COALESCE(genres.list, '{}') AS genres,
+      companies.list AS companies,
+      sources.list AS sources,
+      relationships.list AS relationships
+    FROM canonical_games cg
+    LEFT JOIN LATERAL (
+      SELECT array_agg(DISTINCT p.name) AS list
+      FROM games g
+      JOIN game_platforms gp ON gp.game_id = g.id
+      JOIN platforms p ON p.id = gp.platform_id
+      WHERE g.canonical_id = cg.id
+    ) platforms ON true
+    LEFT JOIN LATERAL (
+      SELECT array_agg(gn.name) AS list
+      FROM canonical_game_genres cgg
+      JOIN genres gn ON gn.id = cgg.genre_id
+      WHERE cgg.canonical_id = cg.id
+    ) genres ON true
+    LEFT JOIN LATERAL (
+      SELECT json_agg(json_build_object(
+        'name', c.name,
+        'isDeveloper', gc.is_developer,
+        'isPublisher', gc.is_publisher,
+        'isPorting', gc.is_porting,
+        'isSupporting', gc.is_supporting
+      )) AS list
+      FROM game_companies gc
+      JOIN companies c ON c.id = gc.company_id
+      WHERE gc.canonical_id = cg.id
+    ) companies ON true
+    LEFT JOIN LATERAL (
+      SELECT json_agg(json_build_object(
+        'source', g2.source,
+        'sourceId', g2.source_id,
+        'title', g2.title
+      )) AS list
+      FROM games g2
+      WHERE g2.canonical_id = cg.id
+    ) sources ON true
+    LEFT JOIN LATERAL (
+      SELECT json_agg(json_build_object(
+        'type', gr.type,
+        'toId', gr.to_canonical_id::text,
+        'toTitle', cg2.title
+      )) AS list
+      FROM game_relationships gr
+      JOIN canonical_games cg2 ON cg2.id = gr.to_canonical_id
+      WHERE gr.from_canonical_id = cg.id
+    ) relationships ON true
+    ORDER BY cg.id
+  `;
+
+  return rows.map((row) => ({
+    ...row,
+    companies: row.companies ?? [],
+    sources: row.sources ?? [],
+    relationships: row.relationships ?? [],
+  }));
+}

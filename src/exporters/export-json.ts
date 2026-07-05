@@ -1,8 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { Game } from "../types/game";
 
-export async function exportJson(filename: string, games: Game[]) {
+export async function exportJson<T>(filename: string, data: T): Promise<void> {
   await mkdir(dirname(filename), { recursive: true });
-  await writeFile(filename, JSON.stringify(games, null, 2), "utf-8");
+  await writeFile(filename, JSON.stringify(data, null, 2), "utf-8");
 }
