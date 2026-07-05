@@ -6,6 +6,10 @@ Questions ouvertes et idées à traiter.
 - Stratégie de déduplication multi-sources (RAWG + IGDB pour le même jeu)
 - Recherche plein texte PostgreSQL sur les titres
 - Intégration future SvelteKit
+- Piste d'intégration : le catalogue game-catalog (DB + exports JSON) pourrait
+  être exploité comme backend pour le projet perso MyVault (en construction),
+  afin de disposer d'une DB de jeux + front pour explorer les jeux remontés
+  par RAWG/IGDB. Pas de spec ni de code à ce stade.
 - Extension : croisement de bibliothèques Steam multi-utilisateurs (trouver les jeux
   en commun entre plusieurs comptes, à partir de leurs SteamID64) — inspiré d'un
   projet perso antérieur (D:\_DEV\LABS\SteamFriends, Python, abandonné/incomplet,
