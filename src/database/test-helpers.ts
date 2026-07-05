@@ -14,6 +14,6 @@ export async function resetDatabase(): Promise<void> {
       steam_library_games, rawg_game_credits,
       game_companies, companies, game_relationships,
       canonical_game_genres, genres, canonical_games
-    RESTART IDENTITY CASCADE
+    CASCADE
   `;
 }

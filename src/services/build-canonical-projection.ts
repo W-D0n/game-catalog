@@ -1,5 +1,5 @@
 import { getAllGamesForMatching, type MatchingGame } from "../database/game-repository";
-import { buildCanonicalGroups, type MatchableIdentity } from "../matching/build-canonical-groups";
+import { buildCanonicalGroups } from "../matching/build-canonical-groups";
 import {
   createCanonicalGamesBulk,
   linkGamesToCanonicalBulk,
@@ -26,22 +26,98 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 /**
- * Construit la projection canonique complète : regroupe les source games
- * (matching titre/année/plateformes), crée canonical_games/companies/genres,
- * puis résout les relations (remake/dlc/edition) via parent_game/version_parent.
- * Écritures en lots (INSERT multi-lignes) pour rester praticable à l'échelle
- * du catalogue complet.
+ * Construit ou complète la projection canonique : ne retraite que les jeux
+ * pas encore liés (games.canonical_id NULL). Un groupe de blocking touchant
+ * un seul canonical game existant l'étend (nouveaux membres liés, sociétés/
+ * genres ajoutés). Un groupe touchant plusieurs canonical games existants
+ * est ambigu (re-matching non spécifié, voir spec §10) — ses nouveaux
+ * membres sont laissés non liés plutôt que de fusionner à l'aveugle.
  */
 export async function buildCanonicalProjection(): Promise<void> {
-  const games = await getAllGamesForMatching();
-  console.log(`${games.length} jeux chargés pour le matching.`);
+  const allGames = await getAllGamesForMatching();
+  const newGames = allGames.filter((g) => g.canonicalId === null);
 
-  const groups = buildCanonicalGroups(games);
-  console.log(`${groups.length} groupes canoniques identifiés.`);
+  console.log(`${allGames.length} jeux au total, ${newGames.length} nouveaux à traiter.`);
+
+  if (newGames.length === 0) {
+    console.log("Rien à faire — tous les jeux sont déjà liés à un canonical game.");
+    return;
+  }
+
+  const groups = buildCanonicalGroups(allGames);
+
+  const canonicalIdByGameId = new Map<bigint, bigint>();
+  for (const game of allGames) {
+    if (game.canonicalId !== null) canonicalIdByGameId.set(game.id, game.canonicalId);
+  }
+
+  const newCanonicalGroups: MatchingGame[][] = [];
+  const groupsToExtend: { canonicalId: bigint; newMembers: MatchingGame[] }[] = [];
+  let skippedAmbiguous = 0;
+
+  for (const group of groups) {
+    const newMembers = group.filter((g) => g.canonicalId === null);
+    if (newMembers.length === 0) continue;
+
+    const existingIds = new Set(
+      group.filter((g) => g.canonicalId !== null).map((g) => g.canonicalId!)
+    );
+
+    if (existingIds.size === 0) {
+      newCanonicalGroups.push(group);
+    } else if (existingIds.size === 1) {
+      groupsToExtend.push({ canonicalId: [...existingIds][0]!, newMembers });
+    } else {
+      skippedAmbiguous += newMembers.length;
+      console.log(
+        `  ambigu (${existingIds.size} canonical games existants touchés) — ignoré : ${newMembers
+          .map((g) => g.title)
+          .join(", ")}`
+      );
+    }
+  }
+
+  console.log(
+    `${newCanonicalGroups.length} nouveaux canonical games à créer, ${groupsToExtend.length} existants à étendre, ${skippedAmbiguous} jeux ambigus ignorés.`
+  );
+
+  const gameCompanyLinks = new Map<string, GameCompanyLink>();
+  const genreLinkKeys = new Set<string>();
+  const genreLinks: GenreLink[] = [];
+  const links: GameCanonicalLink[] = [];
+
+  function collectCompanyAndGenreLinks(canonicalId: bigint, game: MatchingGame): void {
+    for (const company of game.rawMetadata?.companies ?? []) {
+      const companyId = companyIdByName.get(company.name);
+      if (companyId === undefined) continue;
+
+      const key = `${canonicalId}:${companyId}`;
+      const existing = gameCompanyLinks.get(key);
+      if (existing) {
+        existing.isDeveloper ||= company.isDeveloper;
+        existing.isPublisher ||= company.isPublisher;
+        existing.isPorting ||= company.isPorting;
+        existing.isSupporting ||= company.isSupporting;
+      } else {
+        gameCompanyLinks.set(key, { canonicalId, companyId, ...company });
+      }
+    }
+
+    for (const genreName of game.rawMetadata?.genres ?? []) {
+      const genreId = genreIdByName.get(genreName);
+      if (genreId === undefined) continue;
+
+      const key = `${canonicalId}:${genreId}`;
+      if (!genreLinkKeys.has(key)) {
+        genreLinkKeys.add(key);
+        genreLinks.push({ canonicalId, genreId });
+      }
+    }
+  }
 
   const companyNames = new Set<string>();
   const genreNames = new Set<string>();
-  for (const game of games) {
+  for (const game of newGames) {
     for (const company of game.rawMetadata?.companies ?? []) companyNames.add(company.name);
     for (const genre of game.rawMetadata?.genres ?? []) genreNames.add(genre);
   }
@@ -58,15 +134,10 @@ export async function buildCanonicalProjection(): Promise<void> {
     for (const [name, id] of await saveGenresBulk(batch)) genreIdByName.set(name, id);
   }
 
-  console.log("Création des canonical_games...");
+  console.log("Création des nouveaux canonical_games...");
 
-  const canonicalIdByGameId = new Map<bigint, bigint>();
-  const gameCompanyLinks = new Map<string, GameCompanyLink>();
-  const genreLinkKeys = new Set<string>();
-  const genreLinks: GenreLink[] = [];
   let processedGroups = 0;
-
-  for (const groupChunk of chunk(groups, BATCH_SIZE)) {
+  for (const groupChunk of chunk(newCanonicalGroups, BATCH_SIZE)) {
     const canonicalData = groupChunk.map((group) => {
       const igdbMember = group.find((g) => g.source === "igdb");
       const primary = igdbMember ?? group[0]!;
@@ -79,47 +150,33 @@ export async function buildCanonicalProjection(): Promise<void> {
 
     const canonicalIds = await createCanonicalGamesBulk(canonicalData);
 
-    const links: GameCanonicalLink[] = [];
     for (let i = 0; i < groupChunk.length; i++) {
       const canonicalId = canonicalIds[i]!;
 
       for (const game of groupChunk[i]!) {
         canonicalIdByGameId.set(game.id, canonicalId);
         links.push({ gameId: game.id, canonicalId });
-
-        for (const company of game.rawMetadata?.companies ?? []) {
-          const companyId = companyIdByName.get(company.name);
-          if (companyId === undefined) continue;
-
-          const key = `${canonicalId}:${companyId}`;
-          const existing = gameCompanyLinks.get(key);
-          if (existing) {
-            existing.isDeveloper ||= company.isDeveloper;
-            existing.isPublisher ||= company.isPublisher;
-            existing.isPorting ||= company.isPorting;
-            existing.isSupporting ||= company.isSupporting;
-          } else {
-            gameCompanyLinks.set(key, { canonicalId, companyId, ...company });
-          }
-        }
-
-        for (const genreName of game.rawMetadata?.genres ?? []) {
-          const genreId = genreIdByName.get(genreName);
-          if (genreId === undefined) continue;
-
-          const key = `${canonicalId}:${genreId}`;
-          if (!genreLinkKeys.has(key)) {
-            genreLinkKeys.add(key);
-            genreLinks.push({ canonicalId, genreId });
-          }
-        }
+        collectCompanyAndGenreLinks(canonicalId, game);
       }
     }
 
-    await linkGamesToCanonicalBulk(links);
-
     processedGroups += groupChunk.length;
-    console.log(`${processedGroups}/${groups.length} groupes canoniques créés et liés...`);
+    console.log(`${processedGroups}/${newCanonicalGroups.length} nouveaux groupes créés...`);
+  }
+
+  console.log("Extension des canonical_games existants...");
+
+  for (const { canonicalId, newMembers } of groupsToExtend) {
+    for (const game of newMembers) {
+      canonicalIdByGameId.set(game.id, canonicalId);
+      links.push({ gameId: game.id, canonicalId });
+      collectCompanyAndGenreLinks(canonicalId, game);
+    }
+  }
+
+  console.log(`Liaison de ${links.length} jeux à leur canonical game...`);
+  for (const batch of chunk(links, BATCH_SIZE)) {
+    await linkGamesToCanonicalBulk(batch);
   }
 
   console.log(`Insertion de ${gameCompanyLinks.size} liens société...`);
@@ -135,12 +192,12 @@ export async function buildCanonicalProjection(): Promise<void> {
   console.log("Résolution des relations (parent_game/version_parent)...");
 
   const gameBySourceId = new Map<string, MatchingGame>();
-  for (const game of games) {
+  for (const game of allGames) {
     if (game.source === "igdb") gameBySourceId.set(game.sourceId, game);
   }
 
   const relationshipLinks: RelationshipLink[] = [];
-  for (const game of games) {
+  for (const game of allGames) {
     if (game.source !== "igdb") continue;
 
     const fromCanonicalId = canonicalIdByGameId.get(game.id);
@@ -176,7 +233,7 @@ export async function buildCanonicalProjection(): Promise<void> {
     await saveGameRelationshipsBulk(batch);
   }
 
-  console.log(`Projection canonique terminée : ${groups.length} canonical games.`);
+  console.log(
+    `Projection canonique terminée : ${newCanonicalGroups.length} nouveaux canonical games créés, ${groupsToExtend.length} étendus, ${skippedAmbiguous} jeux ambigus laissés non liés.`
+  );
 }
-
-export type { MatchableIdentity };

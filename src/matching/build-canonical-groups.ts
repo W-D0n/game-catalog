@@ -2,6 +2,13 @@ import { groupByBlockingKey } from "./blocking";
 import { decideMatch, type MatchableGame } from "./decide-match";
 import type { SourceGameMetadata } from "../types/game";
 
+/**
+ * Comparaison par paires en O(k²) au sein d'un groupe — au-delà de cette
+ * taille, on saute la comparaison (aucune fusion) plutôt que de risquer un
+ * ralentissement pathologique sur un titre anormalement dupliqué.
+ */
+const MAX_BLOCK_SIZE = 200;
+
 export interface MatchableIdentity extends MatchableGame {
   id: bigint;
   source: string;
@@ -35,9 +42,10 @@ function union(parent: Map<bigint, bigint>, a: bigint, b: bigint): void {
 /**
  * Regroupe les source games en groupes canoniques : blocking par titre exact
  * normalisé, puis union-find sur les paires décidées `merge` par decideMatch.
- * Fonction pure, aucune écriture DB.
+ * Fonction pure, aucune écriture DB. Générique pour préserver les champs
+ * additionnels du type d'entrée (ex: canonicalId) dans les groupes retournés.
  */
-export function buildCanonicalGroups(games: MatchableIdentity[]): MatchableIdentity[][] {
+export function buildCanonicalGroups<T extends MatchableIdentity>(games: T[]): T[][] {
   const parent = new Map<bigint, bigint>();
   for (const game of games) {
     parent.set(game.id, game.id);
@@ -45,6 +53,8 @@ export function buildCanonicalGroups(games: MatchableIdentity[]): MatchableIdent
 
   const blocks = groupByBlockingKey(games);
   for (const blockGames of blocks.values()) {
+    if (blockGames.length > MAX_BLOCK_SIZE) continue;
+
     for (let i = 0; i < blockGames.length; i++) {
       for (let j = i + 1; j < blockGames.length; j++) {
         const a = blockGames[i]!;
@@ -57,7 +67,7 @@ export function buildCanonicalGroups(games: MatchableIdentity[]): MatchableIdent
     }
   }
 
-  const groups = new Map<bigint, MatchableIdentity[]>();
+  const groups = new Map<bigint, T[]>();
   for (const game of games) {
     const root = find(parent, game.id);
     if (!groups.has(root)) groups.set(root, []);

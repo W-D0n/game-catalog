@@ -135,4 +135,94 @@ describe("buildCanonicalProjection", () => {
     const relationships = await db<{ type: string }[]>`SELECT type FROM game_relationships`;
     expect(relationships).toEqual([{ type: "remake_of" }]);
   });
+
+  test("[buildCanonicalProjection] ré-exécution sans nouveau jeu ne crée rien de plus", async () => {
+    await saveGameWithPlatforms({
+      source: "rawg",
+      sourceId: "1",
+      title: "Portal",
+      releaseYear: 2007,
+      platforms: ["PC"],
+    });
+
+    await buildCanonicalProjection();
+    await buildCanonicalProjection();
+
+    const canonicalGames = await db<{ id: string }[]>`SELECT id FROM canonical_games`;
+    expect(canonicalGames).toHaveLength(1);
+  });
+
+  test("[buildCanonicalProjection] un nouveau jeu qui matche un canonical existant l'étend au lieu d'en créer un nouveau", async () => {
+    await saveGameWithPlatforms({
+      source: "rawg",
+      sourceId: "1",
+      title: "Portal 2",
+      releaseYear: 2011,
+      platforms: ["PC"],
+    });
+
+    await buildCanonicalProjection();
+
+    const [before] = await db<{ id: string }[]>`SELECT id FROM canonical_games`;
+
+    await saveGameWithPlatforms({
+      source: "igdb",
+      sourceId: "100",
+      title: "Portal 2",
+      releaseYear: 2011,
+      platforms: ["PC (Microsoft Windows)"],
+    });
+
+    await buildCanonicalProjection();
+
+    const canonicalGames = await db<{ id: string }[]>`SELECT id FROM canonical_games`;
+    expect(canonicalGames).toHaveLength(1);
+    expect(canonicalGames[0]?.id).toBe(before!.id);
+
+    const linkedGames = await db<{ canonical_id: string }[]>`
+      SELECT DISTINCT canonical_id FROM games
+    `;
+    expect(linkedGames).toHaveLength(1);
+  });
+
+  test("[buildCanonicalProjection] nouveau jeu ambigu (touche 2 canonical games existants) reste non lié", async () => {
+    // Deux jeux "Chess" distincts, déjà chacun leur canonical game (pas de recouvrement de plateforme entre eux).
+    await saveGameWithPlatforms({
+      source: "rawg",
+      sourceId: "1",
+      title: "Chess",
+      releaseYear: 2020,
+      platforms: ["PlayStation 5"],
+    });
+    await saveGameWithPlatforms({
+      source: "igdb",
+      sourceId: "2",
+      title: "Chess",
+      releaseYear: 2020,
+      platforms: ["Xbox One"],
+    });
+    await buildCanonicalProjection();
+
+    const [canonicalA, canonicalB] = await db<{ id: string }[]>`SELECT id FROM canonical_games ORDER BY id`;
+    expect(canonicalA).toBeDefined();
+    expect(canonicalB).toBeDefined();
+
+    // Un nouveau jeu qui matche les deux à la fois (même plateformes que les deux réunies).
+    await saveGameWithPlatforms({
+      source: "rawg",
+      sourceId: "3",
+      title: "Chess",
+      releaseYear: 2020,
+      platforms: ["PlayStation 5", "Xbox One"],
+    });
+    await buildCanonicalProjection();
+
+    const canonicalGames = await db<{ id: string }[]>`SELECT id FROM canonical_games`;
+    expect(canonicalGames).toHaveLength(2);
+
+    const [ambiguousGame] = await db<{ canonical_id: string | null }[]>`
+      SELECT canonical_id FROM games WHERE source_id = '3' AND source = 'rawg'
+    `;
+    expect(ambiguousGame?.canonical_id).toBeNull();
+  });
 });

@@ -299,8 +299,13 @@ une API sans vérifier) :
   une couverture exhaustive de toutes les plateformes IGDB possibles — à
   compléter si de nouvelles plateformes apparaissent côté RAWG ou IGDB et
   que le recouvrement se dégrade silencieusement.
-- [ ] Stratégie de re-matching incrémental (un canonical existant qui doit se
-  re-scinder ou fusionner après nouvelle donnée) non spécifiée.
+- [x] **Re-matching incrémental — traité conservativement le 2026-07-05** :
+  `buildCanonicalProjection()` ne retraite que `canonical_id IS NULL`. Un
+  nouveau jeu qui matche un seul canonical existant l'étend. Un nouveau jeu
+  qui touche **plusieurs** canonical games existants (cas ambigu — devrait-il
+  les fusionner ?) est **laissé non lié** plutôt que de fusionner à l'aveugle
+  — pas de scission automatique de canonical existant non plus (non
+  implémenté, cohérent avec "jamais de merge auto en cas d'incertitude").
 - [ ] **Tolérance `early_access` (étape 2) non implémentée** : nécessite la
   résolution du lookup `game_status` IGDB (actuellement un id brut non résolu
   en libellé dans `raw_metadata`, voir §9) — à faire en session 5.

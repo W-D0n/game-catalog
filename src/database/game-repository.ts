@@ -67,6 +67,7 @@ export async function getGameIdentitiesBySource(source: string): Promise<GameIde
     SELECT id, source_id AS "sourceId", title
     FROM games
     WHERE source = ${source}
+    ORDER BY id
   `;
   return rows.map((row) => ({ id: BigInt(row.id), sourceId: row.sourceId, title: row.title }));
 }
@@ -79,9 +80,10 @@ export interface MatchingGame {
   releaseYear: number | null;
   platforms: string[];
   rawMetadata?: SourceGameMetadata;
+  canonicalId: bigint | null;
 }
 
-/** Toutes les sources, avec plateformes et métadonnées — entrée du matching multi-sources. */
+/** Toutes les sources, avec plateformes, métadonnées et lien canonique existant — entrée du matching multi-sources. */
 export async function getAllGamesForMatching(): Promise<MatchingGame[]> {
   const rows = await db<
     {
@@ -92,6 +94,7 @@ export async function getAllGamesForMatching(): Promise<MatchingGame[]> {
       releaseYear: number | null;
       rawMetadata: string | null;
       platforms: string[];
+      canonicalId: string | null;
     }[]
   >`
     SELECT
@@ -101,6 +104,7 @@ export async function getAllGamesForMatching(): Promise<MatchingGame[]> {
       g.title,
       g.release_year AS "releaseYear",
       g.raw_metadata AS "rawMetadata",
+      g.canonical_id AS "canonicalId",
       COALESCE(array_agg(p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS platforms
     FROM games g
     LEFT JOIN game_platforms gp ON gp.game_id = g.id
@@ -111,6 +115,7 @@ export async function getAllGamesForMatching(): Promise<MatchingGame[]> {
   return rows.map((row) => ({
     ...row,
     id: BigInt(row.id),
+    canonicalId: row.canonicalId ? BigInt(row.canonicalId) : null,
     rawMetadata: row.rawMetadata ? (JSON.parse(row.rawMetadata) as SourceGameMetadata) : undefined,
   }));
 }

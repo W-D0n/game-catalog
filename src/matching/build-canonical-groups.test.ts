@@ -93,4 +93,14 @@ describe("buildCanonicalGroups", () => {
   test("[buildCanonicalGroups] tableau vide retourne []", () => {
     expect(buildCanonicalGroups([])).toEqual([]);
   });
+
+  test("[buildCanonicalGroups] groupe surdimensionné (> 200) n'est jamais fusionné", () => {
+    const games = Array.from({ length: 201 }, (_, i) =>
+      buildGame({ id: BigInt(i + 1), releaseYear: 2015, platforms: ["PC"] })
+    );
+
+    const groups = buildCanonicalGroups(games);
+
+    expect(groups).toHaveLength(201);
+  });
 });
