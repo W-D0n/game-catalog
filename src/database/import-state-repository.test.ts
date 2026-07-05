@@ -1,37 +1,37 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { getAllImportStates, getLastPage, saveLastPage } from "./import-state-repository";
+import { getAllImportStates, getLastCursor, saveLastCursor } from "./import-state-repository";
 import { resetDatabase } from "./test-helpers";
 
 beforeEach(async () => {
   await resetDatabase();
 });
 
-describe("getLastPage", () => {
-  test("[getLastPage] provider inconnu retourne 0", async () => {
-    expect(await getLastPage("rawg")).toBe(0);
+describe("getLastCursor", () => {
+  test("[getLastCursor] provider inconnu retourne 0", async () => {
+    expect(await getLastCursor("rawg")).toBe(0);
   });
 
-  test("[getLastPage] retourne la dernière page sauvegardée", async () => {
-    await saveLastPage("rawg", 42);
+  test("[getLastCursor] retourne le dernier curseur sauvegardé", async () => {
+    await saveLastCursor("rawg", 42);
 
-    expect(await getLastPage("rawg")).toBe(42);
+    expect(await getLastCursor("rawg")).toBe(42);
   });
 });
 
-describe("saveLastPage", () => {
-  test("[saveLastPage] rejouer avec une nouvelle valeur fait un upsert", async () => {
-    await saveLastPage("rawg", 10);
-    await saveLastPage("rawg", 11);
+describe("saveLastCursor", () => {
+  test("[saveLastCursor] rejouer avec une nouvelle valeur fait un upsert", async () => {
+    await saveLastCursor("rawg", 10);
+    await saveLastCursor("rawg", 11);
 
-    expect(await getLastPage("rawg")).toBe(11);
+    expect(await getLastCursor("rawg")).toBe(11);
   });
 
-  test("[saveLastPage] providers différents ne se marchent pas dessus", async () => {
-    await saveLastPage("rawg", 100);
-    await saveLastPage("igdb", 5);
+  test("[saveLastCursor] providers différents ne se marchent pas dessus", async () => {
+    await saveLastCursor("rawg", 100);
+    await saveLastCursor("igdb", 5);
 
-    expect(await getLastPage("rawg")).toBe(100);
-    expect(await getLastPage("igdb")).toBe(5);
+    expect(await getLastCursor("rawg")).toBe(100);
+    expect(await getLastCursor("igdb")).toBe(5);
   });
 });
 
@@ -41,14 +41,14 @@ describe("getAllImportStates", () => {
   });
 
   test("[getAllImportStates] triés par provider", async () => {
-    await saveLastPage("rawg", 100);
-    await saveLastPage("igdb", 5);
+    await saveLastCursor("rawg", 100);
+    await saveLastCursor("igdb", 5);
 
     const states = await getAllImportStates();
 
     expect(states).toEqual([
-      { provider: "igdb", lastPage: 5 },
-      { provider: "rawg", lastPage: 100 },
+      { provider: "igdb", lastCursor: 5 },
+      { provider: "rawg", lastCursor: 100 },
     ]);
   });
 });

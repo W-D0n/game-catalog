@@ -37,7 +37,7 @@ describe("RawgProvider.fetchPage — validation de la réponse", () => {
     global.fetch = originalFetch;
   });
 
-  test("[fetchPage] réponse conforme au schéma mappée en Game[]", async () => {
+  test("[fetchPage] réponse conforme au schéma mappée en Game[], nextCursor = page fetchée", async () => {
     global.fetch = (() =>
       Promise.resolve(
         new Response(
@@ -57,28 +57,44 @@ describe("RawgProvider.fetchPage — validation de la réponse", () => {
         )
       )) as unknown as typeof fetch;
 
-    const games = await new RawgProvider().fetchPage(1);
+    const result = await new RawgProvider().fetchPage(0);
 
-    expect(games).toEqual([
-      {
-        source: "rawg",
-        sourceId: "42",
-        title: "Portal 2",
-        releaseYear: 2011,
-        platforms: ["PC"],
-        slug: "portal-2",
-      },
-    ]);
+    expect(result).toEqual({
+      games: [
+        {
+          source: "rawg",
+          sourceId: "42",
+          title: "Portal 2",
+          releaseYear: 2011,
+          platforms: ["PC"],
+          slug: "portal-2",
+        },
+      ],
+      nextCursor: 1,
+    });
+  });
+
+  test("[fetchPage] curseur=5 fetch la page 6, nextCursor=6", async () => {
+    let requestedUrl: string | undefined;
+    global.fetch = ((url: URL) => {
+      requestedUrl = url.toString();
+      return Promise.resolve(
+        new Response(JSON.stringify({ next: null, results: [] }), { status: 200 })
+      );
+    }) as unknown as typeof fetch;
+
+    const result = await new RawgProvider().fetchPage(5);
+
+    expect(requestedUrl).toContain("page=6");
+    expect(result).toEqual({ games: [], nextCursor: 5 });
   });
 
   test("[fetchPage] réponse ne respectant pas le schéma rejette avec ProviderError", async () => {
     global.fetch = (() =>
       Promise.resolve(
-        new Response(JSON.stringify({ results: [{ id: "pas-un-nombre" }] }), {
-          status: 200,
-        })
+        new Response(JSON.stringify({ results: [{ id: "pas-un-nombre" }] }), { status: 200 })
       )) as unknown as typeof fetch;
 
-    await expect(new RawgProvider().fetchPage(1)).rejects.toThrow(ProviderError);
+    await expect(new RawgProvider().fetchPage(0)).rejects.toThrow(ProviderError);
   });
 });

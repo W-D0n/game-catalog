@@ -12,5 +12,5 @@ console.log(`Plateformes: ${platformsCount}`);
 console.log("");
 console.log("Import state :");
 for (const state of importStates) {
-  console.log(`  ${state.provider} : page ${state.lastPage}`);
+  console.log(`  ${state.provider} : curseur ${state.lastCursor}`);
 }

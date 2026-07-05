@@ -1,8 +1,21 @@
 import type { Game } from "../types/game";
 
+export interface FetchPageResult {
+  games: Game[];
+  /**
+   * Curseur à repasser au prochain appel de `fetchPage` pour reprendre après
+   * ce lot. Sémantique définie par chaque provider (ex: RAWG = numéro de
+   * page ; IGDB = dernier id vu) — jamais une simple pagination offset/limit
+   * calculée par l'appelant, pour rester stable même si le jeu de données
+   * change pendant le crawl (voir docs/inbox.md, bug de trous de couverture
+   * IGDB corrigé le 2026-07-05).
+   */
+  nextCursor: number;
+}
+
 export interface GameProvider {
   readonly name: string;
-  fetchPage(page: number): Promise<Game[]>;
+  fetchPage(cursor: number): Promise<FetchPageResult>;
 }
 
 /** Erreur d'un provider qui ne doit pas être retentée (permanente). */

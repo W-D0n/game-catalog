@@ -25,7 +25,7 @@ describe("IgdbProvider.fetchPage", () => {
     global.fetch = originalFetch;
   });
 
-  test("[fetchPage] réponse conforme au schéma mappée en Game[]", async () => {
+  test("[fetchPage] réponse conforme au schéma mappée en Game[], nextCursor = max id du lot", async () => {
     global.fetch = mockFetchSequence([
       tokenResponse(),
       new Response(
@@ -42,26 +42,47 @@ describe("IgdbProvider.fetchPage", () => {
       ),
     ]);
 
-    const games = await new IgdbProvider().fetchPage(1);
+    const result = await new IgdbProvider().fetchPage(0);
 
-    expect(games).toEqual([
-      {
-        source: "igdb",
-        sourceId: "1942",
-        title: "The Witcher 3: Wild Hunt",
-        releaseYear: 2015,
-        platforms: ["PC (Microsoft Windows)"],
-        slug: "the-witcher-3-wild-hunt",
-        rawMetadata: {
-          genres: undefined,
-          companies: undefined,
-          gameType: null,
-          gameStatus: null,
-          parentGame: null,
-          versionParent: null,
+    expect(result).toEqual({
+      games: [
+        {
+          source: "igdb",
+          sourceId: "1942",
+          title: "The Witcher 3: Wild Hunt",
+          releaseYear: 2015,
+          platforms: ["PC (Microsoft Windows)"],
+          slug: "the-witcher-3-wild-hunt",
+          rawMetadata: {
+            genres: undefined,
+            companies: undefined,
+            gameType: null,
+            gameStatus: null,
+            parentGame: null,
+            versionParent: null,
+          },
         },
-      },
-    ]);
+      ],
+      nextCursor: 1942,
+    });
+  });
+
+  test("[fetchPage] requête utilise where id > curseur, jamais offset (pagination stable, cf. docs/inbox.md)", async () => {
+    let gamesRequestBody: string | undefined;
+
+    global.fetch = ((_url: string, init?: RequestInit) => {
+      const isTokenRequest = String(init?.body ?? "").includes("grant_type");
+      if (isTokenRequest) {
+        return Promise.resolve(tokenResponse());
+      }
+      gamesRequestBody = String(init?.body);
+      return Promise.resolve(new Response("[]", { status: 200 }));
+    }) as unknown as typeof fetch;
+
+    await new IgdbProvider().fetchPage(1234);
+
+    expect(gamesRequestBody).toContain("where id > 1234");
+    expect(gamesRequestBody).not.toContain("offset");
   });
 
   test("[fetchPage] mappe genres, studios (rôles cumulables) et relations en rawMetadata", async () => {
@@ -100,9 +121,9 @@ describe("IgdbProvider.fetchPage", () => {
       ),
     ]);
 
-    const games = await new IgdbProvider().fetchPage(1);
+    const result = await new IgdbProvider().fetchPage(0);
 
-    expect(games[0]?.rawMetadata).toEqual({
+    expect(result.games[0]?.rawMetadata).toEqual({
       genres: ["RPG", "Adventure"],
       companies: [
         {
@@ -138,18 +159,18 @@ describe("IgdbProvider.fetchPage", () => {
       ),
     ]);
 
-    const games = await new IgdbProvider().fetchPage(1);
+    const result = await new IgdbProvider().fetchPage(0);
 
-    expect(games[0]?.releaseYear).toBeNull();
-    expect(games[0]?.platforms).toEqual([]);
+    expect(result.games[0]?.releaseYear).toBeNull();
+    expect(result.games[0]?.platforms).toEqual([]);
   });
 
-  test("[fetchPage] tableau vide retourne []", async () => {
+  test("[fetchPage] tableau vide retourne games=[] et nextCursor inchangé", async () => {
     global.fetch = mockFetchSequence([tokenResponse(), new Response("[]", { status: 200 })]);
 
-    const games = await new IgdbProvider().fetchPage(1);
+    const result = await new IgdbProvider().fetchPage(42);
 
-    expect(games).toEqual([]);
+    expect(result).toEqual({ games: [], nextCursor: 42 });
   });
 
   test("[fetchPage] réponse ne respectant pas le schéma rejette avec ProviderError", async () => {
@@ -158,7 +179,7 @@ describe("IgdbProvider.fetchPage", () => {
       new Response(JSON.stringify([{ id: "pas-un-nombre" }]), { status: 200 }),
     ]);
 
-    await expect(new IgdbProvider().fetchPage(1)).rejects.toThrow(ProviderError);
+    await expect(new IgdbProvider().fetchPage(0)).rejects.toThrow(ProviderError);
   });
 
   test("[fetchPage] token invalide (401) rejette avec ProviderQuotaError", async () => {
@@ -167,12 +188,12 @@ describe("IgdbProvider.fetchPage", () => {
       new Response("Unauthorized", { status: 401 }),
     ]);
 
-    await expect(new IgdbProvider().fetchPage(1)).rejects.toThrow(ProviderQuotaError);
+    await expect(new IgdbProvider().fetchPage(0)).rejects.toThrow(ProviderQuotaError);
   });
 
   test("[fetchPage] échec d'authentification Twitch rejette avec ProviderError", async () => {
     global.fetch = mockFetchSequence([new Response("invalid client", { status: 400 })]);
 
-    await expect(new IgdbProvider().fetchPage(1)).rejects.toThrow(ProviderError);
+    await expect(new IgdbProvider().fetchPage(0)).rejects.toThrow(ProviderError);
   });
 });

@@ -1,50 +1,45 @@
 import { saveGame } from "../database/game-repository";
 import { savePlatforms } from "../database/platform-repository";
-import { getLastPage, saveLastPage } from "../database/import-state-repository";
+import { getLastCursor, saveLastCursor } from "../database/import-state-repository";
 import { deduplicateGames } from "../deduplication/deduplicate-games";
 import { ProviderQuotaError, type GameProvider } from "../providers/provider";
-import type { Game } from "../types/game";
 
 export async function importGames(
   provider: GameProvider,
-  maxPages: number
+  maxIterations: number
 ): Promise<void> {
-  const startPage = (await getLastPage(provider.name)) + 1;
+  let cursor = await getLastCursor(provider.name);
 
-  if (startPage > maxPages) {
-    console.log(`${provider.name}: déjà importé jusqu'à la page ${maxPages}.`);
-    return;
-  }
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    console.log(`${provider.name}: fetch depuis le curseur ${cursor}...`);
 
-  for (let page = startPage; page <= maxPages; page++) {
-    console.log(`${provider.name}: import page ${page}/${maxPages}...`);
-
-    let games: Game[];
+    let result;
     try {
-      games = await provider.fetchPage(page);
+      result = await provider.fetchPage(cursor);
     } catch (error) {
       if (error instanceof ProviderQuotaError) {
         console.log(
-          `${provider.name}: quota épuisé — arrêt propre. Reprise à la page ${page} au prochain lancement.`
+          `${provider.name}: quota épuisé — arrêt propre. Reprise depuis le curseur ${cursor} au prochain lancement.`
         );
         return;
       }
       throw error;
     }
 
-    if (games.length === 0) {
-      console.log(`${provider.name}: fin de la base atteinte à la page ${page}.`);
+    if (result.games.length === 0) {
+      console.log(`${provider.name}: fin de la base atteinte (curseur ${cursor}).`);
       break;
     }
 
-    const uniqueGames = deduplicateGames(games);
+    const uniqueGames = deduplicateGames(result.games);
 
     for (const game of uniqueGames) {
       const gameId = await saveGame(game);
       await savePlatforms(game, gameId);
     }
 
-    await saveLastPage(provider.name, page);
-    console.log(`${provider.name}: page ${page} — ${uniqueGames.length} jeux sauvegardés.`);
+    cursor = result.nextCursor;
+    await saveLastCursor(provider.name, cursor);
+    console.log(`${provider.name}: curseur ${cursor} — ${uniqueGames.length} jeux sauvegardés.`);
   }
 }

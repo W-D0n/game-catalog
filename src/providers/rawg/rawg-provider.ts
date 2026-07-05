@@ -1,6 +1,5 @@
 import { z } from "zod";
-import type { Game } from "../../types/game";
-import { ProviderError, ProviderQuotaError, type GameProvider } from "../provider";
+import { ProviderError, ProviderQuotaError, type FetchPageResult, type GameProvider } from "../provider";
 import { requireEnv } from "../../config";
 
 const PAGE_SIZE = 40;
@@ -89,9 +88,11 @@ async function fetchPageWithRetry(url: URL, page: number): Promise<RawgResponse>
 export class RawgProvider implements GameProvider {
   readonly name = "rawg";
 
-  async fetchPage(page: number): Promise<Game[]> {
+  /** `cursor` = dernière page complétée (0 = aucune) — la page suivante est cursor+1. */
+  async fetchPage(cursor: number): Promise<FetchPageResult> {
     await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
 
+    const page = cursor + 1;
     const url = new URL("https://api.rawg.io/api/games");
     url.searchParams.set("key", requireEnv("RAWG_API_KEY"));
     url.searchParams.set("page", String(page));
@@ -100,10 +101,10 @@ export class RawgProvider implements GameProvider {
     const data = await fetchPageWithRetry(url, page);
 
     if (data.results.length === 0) {
-      return [];
+      return { games: [], nextCursor: cursor };
     }
 
-    return data.results.map((game) => ({
+    const games = data.results.map((game) => ({
       source: "rawg",
       sourceId: String(game.id),
       title: game.name,
@@ -111,5 +112,7 @@ export class RawgProvider implements GameProvider {
       platforms: game.platforms?.map((p) => p.platform.name) ?? [],
       slug: game.slug,
     }));
+
+    return { games, nextCursor: page };
   }
 }

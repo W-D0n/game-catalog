@@ -17,7 +17,7 @@ défaillances transitoires).
 | **Page** | Une requête RAWG renvoyant jusqu'à `PAGE_SIZE` jeux. |
 | **PAGE_SIZE** | Nombre de jeux par page = 40 (maximum autorisé par RAWG). |
 | **Backfill** | Constitution initiale par crawl séquentiel des pages. |
-| **import_state** | Table traçant la dernière page importée par provider. |
+| **import_state** | Table traçant le curseur de reprise par provider (`last_cursor` — pour RAWG, c'est la dernière page importée ; renommé le 2026-07-05, voir §9 pipeline IGDB pour le contexte). |
 | **Défaillance transitoire** | Réponse non-2xx ou corps non-JSON momentané (502, rate-limit). |
 | **Backoff exponentiel** | Délai d'attente croissant entre tentatives : 1s, 2s, 4s, 8s, 16s. |
 | **Upsert** | INSERT avec `ON CONFLICT` — idempotent sur `(source, source_id)`. |

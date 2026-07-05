@@ -1,6 +1,10 @@
 import { z } from "zod";
-import type { Game } from "../../types/game";
-import { ProviderError, ProviderQuotaError, type GameProvider } from "../provider";
+import {
+  ProviderError,
+  ProviderQuotaError,
+  type FetchPageResult,
+  type GameProvider,
+} from "../provider";
 import { requireEnv } from "../../config";
 
 const PAGE_SIZE = 500;
@@ -77,10 +81,20 @@ async function fetchAccessToken(): Promise<string> {
   return body.access_token;
 }
 
+/**
+ * Pagination par curseur d'id (`where id > lastId`), pas offset/limit.
+ * offset/limit suppose que le tri "id asc" est stable entre deux requêtes —
+ * faux sur IGDB, base communautaire modifiée en continu : une suppression
+ * survenue avant l'offset courant décale silencieusement toutes les lignes
+ * suivantes d'un cran, sautant des jeux sans jamais lever d'erreur (bug
+ * confirmé le 2026-07-05, voir docs/inbox.md). `where id > lastId` est
+ * immunisé par construction contre ce décalage : peu importe ce qui change
+ * avant lastId, tout ce qui a un id strictement supérieur reste inclus.
+ */
 async function fetchPageWithRetry(
   token: string,
-  offset: number,
-  page: number
+  lastId: number,
+  attemptLabel: string
 ): Promise<IgdbGame[]> {
   let lastError = "inconnu";
 
@@ -93,7 +107,7 @@ async function fetchPageWithRetry(
           Authorization: `Bearer ${token}`,
           "Content-Type": "text/plain",
         },
-        body: `fields ${IGDB_FIELDS}; sort id asc; limit ${PAGE_SIZE}; offset ${offset};`,
+        body: `fields ${IGDB_FIELDS}; where id > ${lastId}; sort id asc; limit ${PAGE_SIZE};`,
       });
 
       if (response.ok) {
@@ -103,7 +117,7 @@ async function fetchPageWithRetry(
         if (!parsed.success) {
           throw new ProviderError(
             "igdb",
-            `IGDB page ${page} : réponse invalide (${parsed.error.message})`
+            `IGDB ${attemptLabel} : réponse invalide (${parsed.error.message})`
           );
         }
 
@@ -113,14 +127,14 @@ async function fetchPageWithRetry(
       if (response.status === 401) {
         throw new ProviderQuotaError(
           "igdb",
-          `IGDB page ${page} : token invalide ou expiré (HTTP 401)`
+          `IGDB ${attemptLabel} : token invalide ou expiré (HTTP 401)`
         );
       }
 
       if (response.status !== 429 && response.status < 500) {
         throw new ProviderError(
           "igdb",
-          `IGDB page ${page} : erreur permanente (HTTP ${response.status})`
+          `IGDB ${attemptLabel} : erreur permanente (HTTP ${response.status})`
         );
       }
 
@@ -137,7 +151,7 @@ async function fetchPageWithRetry(
 
   throw new ProviderError(
     "igdb",
-    `IGDB page ${page} : échec après ${MAX_RETRIES} tentatives (${lastError})`
+    `IGDB ${attemptLabel} : échec après ${MAX_RETRIES} tentatives (${lastError})`
   );
 }
 
@@ -150,14 +164,20 @@ export class IgdbProvider implements GameProvider {
     return this.tokenPromise;
   }
 
-  async fetchPage(page: number): Promise<Game[]> {
+  /** `cursor` = dernier id IGDB vu (0 = aucun) — fetch tout ce qui a un id strictement supérieur. */
+  async fetchPage(cursor: number): Promise<FetchPageResult> {
     await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
 
     const token = await this.getToken();
-    const offset = (page - 1) * PAGE_SIZE;
-    const games = await fetchPageWithRetry(token, offset, page);
+    const games = await fetchPageWithRetry(token, cursor, `curseur ${cursor}`);
 
-    return games.map((game) => ({
+    if (games.length === 0) {
+      return { games: [], nextCursor: cursor };
+    }
+
+    const nextCursor = Math.max(...games.map((g) => g.id));
+
+    const mapped = games.map((game) => ({
       source: "igdb",
       sourceId: String(game.id),
       title: game.name,
@@ -183,5 +203,7 @@ export class IgdbProvider implements GameProvider {
         versionParent: game.version_parent ?? null,
       },
     }));
+
+    return { games: mapped, nextCursor };
   }
 }

@@ -82,9 +82,11 @@ CREATE TABLE game_platforms (
 
 CREATE INDEX idx_game_platforms_platform_id ON game_platforms (platform_id);
 
+-- last_cursor : sémantique définie par chaque provider (RAWG : dernier
+-- numéro de page complété ; IGDB : dernier id vu, pagination par curseur).
 CREATE TABLE import_state (
     provider TEXT PRIMARY KEY,
-    last_page INTEGER NOT NULL DEFAULT 0
+    last_cursor BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE steam_library_games (
