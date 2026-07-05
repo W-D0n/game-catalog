@@ -27,6 +27,11 @@ const IGDB_FIELDS = [
   "game_status",
   "parent_game",
   "version_parent",
+  "cover.url",
+  "screenshots.url",
+  "videos.video_id",
+  "summary",
+  "storyline",
 ].join(",");
 
 const IgdbGameSchema = z.object({
@@ -51,11 +56,26 @@ const IgdbGameSchema = z.object({
   game_status: z.number().nullable().optional(),
   parent_game: z.number().nullable().optional(),
   version_parent: z.number().nullable().optional(),
+  cover: z.object({ url: z.string() }).optional(),
+  screenshots: z.array(z.object({ url: z.string() })).optional(),
+  videos: z.array(z.object({ video_id: z.string() })).optional(),
+  summary: z.string().optional(),
+  storyline: z.string().optional(),
 });
 
 const IgdbResponseSchema = z.array(IgdbGameSchema);
 
 type IgdbGame = z.infer<typeof IgdbGameSchema>;
+
+/**
+ * IGDB renvoie des URLs d'image relatives au protocole, taille "t_thumb" par
+ * défaut (`//images.igdb.com/igdb/image/upload/t_thumb/co1wyy.jpg`) — trop
+ * petite pour un affichage catalogue. On force le protocole et la taille.
+ */
+function toIgdbImageUrl(url: string, size: string): string {
+  const withProtocol = url.startsWith("//") ? `https:${url}` : url;
+  return withProtocol.replace(/\/t_[a-z0-9_]+\//, `/${size}/`);
+}
 
 function backoffDelay(attempt: number): Promise<void> {
   const ms = 1000 * 2 ** (attempt - 1);
@@ -201,6 +221,11 @@ export class IgdbProvider implements GameProvider {
         gameStatus: game.game_status ?? null,
         parentGame: game.parent_game ?? null,
         versionParent: game.version_parent ?? null,
+        coverUrl: game.cover ? toIgdbImageUrl(game.cover.url, "t_cover_big") : null,
+        screenshotUrls: game.screenshots?.map((s) => toIgdbImageUrl(s.url, "t_screenshot_big")),
+        videoIds: game.videos?.map((v) => v.video_id),
+        summary: game.summary ?? null,
+        storyline: game.storyline ?? null,
       },
     }));
 

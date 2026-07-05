@@ -60,6 +60,11 @@ describe("IgdbProvider.fetchPage", () => {
             gameStatus: null,
             parentGame: null,
             versionParent: null,
+            coverUrl: null,
+            screenshotUrls: undefined,
+            videoIds: undefined,
+            summary: null,
+            storyline: null,
           },
         },
       ],
@@ -145,6 +150,48 @@ describe("IgdbProvider.fetchPage", () => {
       gameStatus: 0,
       parentGame: 100,
       versionParent: null,
+      coverUrl: null,
+      screenshotUrls: undefined,
+      videoIds: undefined,
+      summary: null,
+      storyline: null,
+    });
+  });
+
+  test("[fetchPage] mappe cover/screenshots/vidéos/résumé en rawMetadata, cover et screenshots resize", async () => {
+    global.fetch = mockFetchSequence([
+      tokenResponse(),
+      new Response(
+        JSON.stringify([
+          {
+            id: 1942,
+            slug: "the-witcher-3-wild-hunt",
+            name: "The Witcher 3: Wild Hunt",
+            cover: { url: "//images.igdb.com/igdb/image/upload/t_thumb/co1wyy.jpg" },
+            screenshots: [
+              { url: "//images.igdb.com/igdb/image/upload/t_thumb/sc1.jpg" },
+              { url: "//images.igdb.com/igdb/image/upload/t_thumb/sc2.jpg" },
+            ],
+            videos: [{ video_id: "abc123" }],
+            summary: "Un sorceleur traque une prophétie.",
+            storyline: "Geralt de Riv cherche Ciri.",
+          },
+        ]),
+        { status: 200 }
+      ),
+    ]);
+
+    const result = await new IgdbProvider().fetchPage(0);
+
+    expect(result.games[0]?.rawMetadata).toMatchObject({
+      coverUrl: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1wyy.jpg",
+      screenshotUrls: [
+        "https://images.igdb.com/igdb/image/upload/t_screenshot_big/sc1.jpg",
+        "https://images.igdb.com/igdb/image/upload/t_screenshot_big/sc2.jpg",
+      ],
+      videoIds: ["abc123"],
+      summary: "Un sorceleur traque une prophétie.",
+      storyline: "Geralt de Riv cherche Ciri.",
     });
   });
 

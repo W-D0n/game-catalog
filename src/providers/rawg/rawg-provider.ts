@@ -14,6 +14,8 @@ const RawgGameSchema = z.object({
   platforms: z
     .array(z.object({ platform: z.object({ name: z.string() }) }))
     .optional(),
+  background_image: z.string().nullable().optional(),
+  short_screenshots: z.array(z.object({ image: z.string() })).optional(),
 });
 
 const RawgResponseSchema = z.object({
@@ -111,6 +113,10 @@ export class RawgProvider implements GameProvider {
       releaseYear: game.released ? Number(game.released.slice(0, 4)) : null,
       platforms: game.platforms?.map((p) => p.platform.name) ?? [],
       slug: game.slug,
+      rawMetadata: {
+        coverUrl: game.background_image ?? null,
+        screenshotUrls: game.short_screenshots?.map((s) => s.image),
+      },
     }));
 
     return { games, nextCursor: page };

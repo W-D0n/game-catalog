@@ -17,6 +17,11 @@ export interface SourceGameMetadata {
   gameStatus?: number | null;
   parentGame?: number | null;
   versionParent?: number | null;
+  coverUrl?: string | null;
+  screenshotUrls?: string[];
+  videoIds?: string[];
+  summary?: string | null;
+  storyline?: string | null;
 }
 
 export interface Game {

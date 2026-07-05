@@ -140,6 +140,14 @@ export async function saveGameRelationshipsBulk(links: RelationshipLink[]): Prom
   `;
 }
 
+export interface GameMedia {
+  coverUrl: string | null;
+  screenshotUrls: string[];
+  videoIds: string[];
+  summary: string | null;
+  storyline: string | null;
+}
+
 export interface CanonicalGameExport {
   id: string;
   title: string;
@@ -150,15 +158,17 @@ export interface CanonicalGameExport {
   companies: GameCompanyCredit[];
   sources: { source: string; sourceId: string; title: string }[];
   relationships: { type: RelationshipType; toId: string; toTitle: string }[];
+  media: GameMedia | null;
 }
 
 /** Projection canonique complète pour export — un objet par canonical game, provenance et relations incluses. */
 export async function getCanonicalGamesForExport(): Promise<CanonicalGameExport[]> {
   const rows = await db<
-    (Omit<CanonicalGameExport, "companies" | "sources" | "relationships"> & {
+    (Omit<CanonicalGameExport, "companies" | "sources" | "relationships" | "media"> & {
       companies: GameCompanyCredit[] | null;
       sources: { source: string; sourceId: string; title: string }[] | null;
       relationships: { type: RelationshipType; toId: string; toTitle: string }[] | null;
+      media: GameMedia | null;
     })[]
   >`
     SELECT
@@ -170,7 +180,8 @@ export async function getCanonicalGamesForExport(): Promise<CanonicalGameExport[
       COALESCE(genres.list, '{}') AS genres,
       companies.list AS companies,
       sources.list AS sources,
-      relationships.list AS relationships
+      relationships.list AS relationships,
+      media.data AS media
     FROM canonical_games cg
     LEFT JOIN LATERAL (
       SELECT array_agg(DISTINCT p.name) AS list
@@ -216,6 +227,19 @@ export async function getCanonicalGamesForExport(): Promise<CanonicalGameExport[
       JOIN canonical_games cg2 ON cg2.id = gr.to_canonical_id
       WHERE gr.from_canonical_id = cg.id
     ) relationships ON true
+    LEFT JOIN LATERAL (
+      SELECT json_build_object(
+        'coverUrl', src.raw_metadata->>'coverUrl',
+        'screenshotUrls', COALESCE(src.raw_metadata->'screenshotUrls', '[]'::jsonb),
+        'videoIds', COALESCE(src.raw_metadata->'videoIds', '[]'::jsonb),
+        'summary', src.raw_metadata->>'summary',
+        'storyline', src.raw_metadata->>'storyline'
+      ) AS data
+      FROM games src
+      WHERE src.canonical_id = cg.id AND src.raw_metadata IS NOT NULL
+      ORDER BY (src.source = 'igdb') DESC, src.id
+      LIMIT 1
+    ) media ON true
     ORDER BY cg.id
   `;
 
@@ -224,5 +248,6 @@ export async function getCanonicalGamesForExport(): Promise<CanonicalGameExport[
     companies: row.companies ?? [],
     sources: row.sources ?? [],
     relationships: row.relationships ?? [],
+    media: row.media ?? null,
   }));
 }
