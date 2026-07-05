@@ -303,12 +303,24 @@ une API sans vérifier) :
 
 - [x] **Seuils de scoring (étape 3-4) calibrés le 2026-07-04** sur les vraies
   collisions RAWG×IGDB — voir §5 étape 4 pour les chiffres et la méthode.
-- [ ] **Matching fuzzy non implémenté** : seul le titre normalisé exact est
-  géré en v1 (étape 3). Les quasi-doublons avec légère divergence de titre
-  entre sources ne sont pas détectés — nécessiterait une technique dédiée
-  (similarité trigram, ex. extension Postgres `pg_trgm`), non couverte par ce
-  calibrage. Ces cas restent des `games` non liés (pas de faux négatif fatal,
-  juste une couverture incomplète du dédoublonnage).
+- [ ] **Matching fuzzy — exploré et différé le 2026-07-05** (infrastructure
+  posée, implémentation reportée au 2026-08-01). Extension `pg_trgm` activée,
+  index GIN `idx_games_title_trgm` créé (prod + test), exploration empirique
+  faite sur les 322 337 titres IGDB (seule source disponible actuellement).
+  **Découverte bloquante** : la similarité trigram pure, même à seuil élevé
+  (0.85+), produit des faux positifs massifs sur un motif très fréquent —
+  les **séries numérotées** (`"Vacation Adventures: Park Ranger 7"` vs
+  `"...Park Ranger 5/8/9/12/13"`, `"Paradise Lust"` vs `"Paradise Lust 2"`,
+  une série shovelware `"Tiger Fighter 1931... MP090"` à `"MP099"` — 10
+  entrées quasi-identiques mais distinctes). Un garde-fou anti-suite
+  (exclure les paires dont les nombres finaux diffèrent) serait nécessaire
+  mais insuffisant seul. **Calibrer maintenant reviendrait à régler un seuil
+  sur du bruit IGDB interne** (dominé par ce motif shovelware), pas sur le
+  signal RAWG×IGDB réellement visé — même principe que `early_access` (zéro
+  seuil invérifiable sur données non représentatives). Vrais positifs
+  plausibles vus dans l'échantillon (`"Zombies!"` vs `"Zombies"`, sim=1.0) —
+  le signal existe, juste pas calibrable sans RAWG. Reprendre dès le retour
+  de RAWG (2026-08-01), calibrer sur les vraies collisions cross-source.
 - [ ] `src/normalizers/platform-normalizer.ts` est une curation manuelle sur
   les plateformes réellement présentes dans le catalogue au 2026-07-04, pas
   une couverture exhaustive de toutes les plateformes IGDB possibles — à

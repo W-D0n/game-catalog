@@ -1,3 +1,7 @@
+-- Préparé pour le matching fuzzy (différé au 2026-08-01, voir
+-- docs/specs/multi-source-matching.md §10) — pas encore utilisé par le code.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 CREATE TABLE canonical_games (
     id BIGSERIAL PRIMARY KEY,
     title TEXT NOT NULL,
@@ -20,6 +24,9 @@ CREATE TABLE games (
 );
 
 CREATE INDEX idx_games_canonical_id ON games (canonical_id);
+
+-- Idem : préparé pour le matching fuzzy, pas encore utilisé.
+CREATE INDEX idx_games_title_trgm ON games USING GIN (title gin_trgm_ops);
 
 CREATE TABLE game_relationships (
     id BIGSERIAL PRIMARY KEY,
