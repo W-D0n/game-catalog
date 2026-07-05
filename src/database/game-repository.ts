@@ -1,13 +1,21 @@
 import { db } from "./db";
 import type { Game, SourceGameMetadata } from "../types/game";
 
-/** Upsert un jeu et retourne son id, qu'il soit inséré ou mis à jour. */
+/**
+ * Upsert un jeu et retourne son id, qu'il soit inséré ou mis à jour.
+ *
+ * `raw_metadata` doit recevoir l'objet JS brut, jamais un `JSON.stringify`
+ * manuel : Bun sérialise déjà la valeur pour une colonne jsonb, donc un
+ * stringify manuel + `::jsonb` produit un double encodage (le contenu est
+ * stocké comme une chaîne JSON scalaire au lieu d'un objet jsonb — invisible
+ * en lecture via cette même API car `getGamesBySource`/`getAllGamesForMatching`
+ * faisaient un second `JSON.parse` qui compensait, mais cassait tout accès
+ * SQL direct comme `raw_metadata->>'champ'`, cf. incident 2026-07-06).
+ */
 export async function saveGame(game: Game): Promise<bigint> {
-  const rawMetadata = game.rawMetadata ? JSON.stringify(game.rawMetadata) : null;
-
   const [row] = await db<{ id: string }[]>`
     INSERT INTO games (source, source_id, title, release_year, slug, raw_metadata)
-    VALUES (${game.source}, ${game.sourceId}, ${game.title}, ${game.releaseYear ?? null}, ${game.slug ?? null}, ${rawMetadata}::jsonb)
+    VALUES (${game.source}, ${game.sourceId}, ${game.title}, ${game.releaseYear ?? null}, ${game.slug ?? null}, ${game.rawMetadata ?? null})
     ON CONFLICT (source, source_id) DO UPDATE SET title = EXCLUDED.title, raw_metadata = EXCLUDED.raw_metadata
     RETURNING id
   `;
@@ -23,7 +31,7 @@ export async function saveGame(game: Game): Promise<bigint> {
 
 /** Tous les jeux d'une source, plateformes incluses (jointure game_platforms). */
 export async function getGamesBySource(source: string): Promise<Game[]> {
-  const rows = await db<(Omit<Game, "rawMetadata"> & { rawMetadata: string | null })[]>`
+  const rows = await db<(Omit<Game, "rawMetadata"> & { rawMetadata: SourceGameMetadata | null })[]>`
     SELECT
       g.source,
       g.source_id AS "sourceId",
@@ -42,9 +50,7 @@ export async function getGamesBySource(source: string): Promise<Game[]> {
 
   return rows.map((row) => ({
     ...row,
-    rawMetadata: row.rawMetadata
-      ? (JSON.parse(row.rawMetadata) as SourceGameMetadata)
-      : undefined,
+    rawMetadata: row.rawMetadata ?? undefined,
   }));
 }
 
@@ -92,7 +98,7 @@ export async function getAllGamesForMatching(): Promise<MatchingGame[]> {
       sourceId: string;
       title: string;
       releaseYear: number | null;
-      rawMetadata: string | null;
+      rawMetadata: SourceGameMetadata | null;
       platforms: string[];
       canonicalId: string | null;
     }[]
@@ -116,6 +122,6 @@ export async function getAllGamesForMatching(): Promise<MatchingGame[]> {
     ...row,
     id: BigInt(row.id),
     canonicalId: row.canonicalId ? BigInt(row.canonicalId) : null,
-    rawMetadata: row.rawMetadata ? (JSON.parse(row.rawMetadata) as SourceGameMetadata) : undefined,
+    rawMetadata: row.rawMetadata ?? undefined,
   }));
 }

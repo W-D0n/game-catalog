@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { countGames, getGamesBySource, saveGame } from "./game-repository";
 import { savePlatforms } from "./platform-repository";
 import { resetDatabase } from "./test-helpers";
+import { db } from "./db";
 import type { Game } from "../types/game";
 
 function buildGame(overrides: Partial<Game>): Game {
@@ -101,6 +102,22 @@ describe("saveGame", () => {
       parentGame: null,
       versionParent: null,
     });
+  });
+
+  test("[saveGame] raw_metadata est un objet jsonb natif, extractible via ->> (pas une chaîne JSON doublement encodée)", async () => {
+    await saveGame(
+      buildGame({
+        source: "igdb",
+        sourceId: "1942",
+        rawMetadata: { coverUrl: "https://images.igdb.com/x.jpg" },
+      })
+    );
+
+    const [row] = await db<{ cover: string | null }[]>`
+      SELECT raw_metadata->>'coverUrl' AS cover FROM games WHERE source = 'igdb' AND source_id = '1942'
+    `;
+
+    expect(row?.cover).toBe("https://images.igdb.com/x.jpg");
   });
 
   test("[saveGame] même titre, sources différentes ne collisionnent pas", async () => {
