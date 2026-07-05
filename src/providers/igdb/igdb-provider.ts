@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Game } from "../../types/game";
 import { ProviderError, ProviderQuotaError, type GameProvider } from "../provider";
+import { requireEnv } from "../../config";
 
 const PAGE_SIZE = 500;
 const DELAY_MS = 500;
@@ -59,8 +60,8 @@ function backoffDelay(attempt: number): Promise<void> {
 
 async function fetchAccessToken(): Promise<string> {
   const url = new URL("https://id.twitch.tv/oauth2/token");
-  url.searchParams.set("client_id", process.env.IGDB_CLIENT_ID!);
-  url.searchParams.set("client_secret", process.env.IGDB_CLIENT_SECRET!);
+  url.searchParams.set("client_id", requireEnv("IGDB_CLIENT_ID"));
+  url.searchParams.set("client_secret", requireEnv("IGDB_CLIENT_SECRET"));
   url.searchParams.set("grant_type", "client_credentials");
 
   const response = await fetch(url, { method: "POST" });
@@ -88,7 +89,7 @@ async function fetchPageWithRetry(
       const response = await fetch("https://api.igdb.com/v4/games", {
         method: "POST",
         headers: {
-          "Client-ID": process.env.IGDB_CLIENT_ID!,
+          "Client-ID": requireEnv("IGDB_CLIENT_ID"),
           Authorization: `Bearer ${token}`,
           "Content-Type": "text/plain",
         },

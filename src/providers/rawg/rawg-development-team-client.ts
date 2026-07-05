@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ProviderError, ProviderQuotaError } from "../provider";
 import { isRetriableStatus } from "./rawg-provider";
+import { requireEnv } from "../../config";
 
 const MAX_RETRIES = 5;
 
@@ -34,7 +35,7 @@ export async function fetchDevelopmentTeam(rawgGameId: string): Promise<RawgPers
   const url = new URL(
     `https://api.rawg.io/api/games/${rawgGameId}/development-team`
   );
-  url.searchParams.set("key", process.env.RAWG_API_KEY!);
+  url.searchParams.set("key", requireEnv("RAWG_API_KEY"));
 
   let lastError = "inconnu";
 

@@ -20,29 +20,6 @@ export function resolveGameStatus(gameStatus: number | null | undefined): string
   return IGDB_GAME_STATUSES[gameStatus] ?? null;
 }
 
-const IGDB_GAME_TYPE_LABELS: Record<number, string> = {
-  0: "Main Game",
-  1: "DLC",
-  2: "Expansion",
-  3: "Bundle",
-  4: "Standalone Expansion",
-  5: "Mod",
-  6: "Episode",
-  7: "Season",
-  8: "Remake",
-  9: "Remaster",
-  10: "Expanded Game",
-  11: "Port",
-  12: "Fork",
-  13: "Pack / Addon",
-  14: "Update",
-};
-
-export function resolveGameTypeLabel(gameType: number | null | undefined): string | null {
-  if (gameType === null || gameType === undefined) return null;
-  return IGDB_GAME_TYPE_LABELS[gameType] ?? null;
-}
-
 export type RelationshipType = "remake_of" | "remaster_of" | "dlc_of" | "edition_of" | "parent";
 
 /**

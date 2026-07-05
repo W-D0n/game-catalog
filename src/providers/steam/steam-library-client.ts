@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireEnv } from "../../config";
 
 const SteamOwnedGameSchema = z.object({
   appid: z.number(),
@@ -22,8 +23,8 @@ export async function fetchSteamLibrary(): Promise<SteamLibraryGame[]> {
   const url = new URL(
     "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"
   );
-  url.searchParams.set("key", process.env.STEAM_API_KEY!);
-  url.searchParams.set("steamid", process.env.STEAM_ID64!);
+  url.searchParams.set("key", requireEnv("STEAM_API_KEY"));
+  url.searchParams.set("steamid", requireEnv("STEAM_ID64"));
   url.searchParams.set("format", "json");
   url.searchParams.set("include_appinfo", "true");
 

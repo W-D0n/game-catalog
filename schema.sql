@@ -24,6 +24,7 @@ CREATE TABLE game_relationships (
     from_canonical_id BIGINT NOT NULL REFERENCES canonical_games(id) ON DELETE CASCADE,
     to_canonical_id BIGINT NOT NULL REFERENCES canonical_games(id) ON DELETE CASCADE,
     type TEXT NOT NULL CHECK (type IN ('remake_of', 'remaster_of', 'dlc_of', 'edition_of', 'parent')),
+    CHECK (from_canonical_id != to_canonical_id),
     UNIQUE(from_canonical_id, to_canonical_id, type)
 );
 

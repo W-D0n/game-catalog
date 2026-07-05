@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Game } from "../../types/game";
 import { ProviderError, ProviderQuotaError, type GameProvider } from "../provider";
+import { requireEnv } from "../../config";
 
 const PAGE_SIZE = 40;
 const DELAY_MS = 500;
@@ -92,7 +93,7 @@ export class RawgProvider implements GameProvider {
     await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
 
     const url = new URL("https://api.rawg.io/api/games");
-    url.searchParams.set("key", process.env.RAWG_API_KEY!);
+    url.searchParams.set("key", requireEnv("RAWG_API_KEY"));
     url.searchParams.set("page", String(page));
     url.searchParams.set("page_size", String(PAGE_SIZE));
 

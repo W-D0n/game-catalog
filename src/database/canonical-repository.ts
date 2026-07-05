@@ -7,24 +7,6 @@ export interface CanonicalGameData {
   releaseStatus: string | null;
 }
 
-export async function createCanonicalGame(data: CanonicalGameData): Promise<bigint> {
-  const [row] = await db<{ id: string }[]>`
-    INSERT INTO canonical_games (title, release_year, release_status)
-    VALUES (${data.title}, ${data.releaseYear}, ${data.releaseStatus})
-    RETURNING id
-  `;
-
-  if (row === undefined) {
-    throw new Error("createCanonicalGame : aucune ligne retournée");
-  }
-
-  return BigInt(row.id);
-}
-
-export async function linkGameToCanonical(gameId: bigint, canonicalId: bigint): Promise<void> {
-  await db`UPDATE games SET canonical_id = ${canonicalId} WHERE id = ${gameId}`;
-}
-
 /** Insertion multi-lignes : un seul aller-retour pour tout un lot. Ordre RETURNING garanti = ordre VALUES (INSERT simple, une seule table). */
 export async function createCanonicalGamesBulk(rows: CanonicalGameData[]): Promise<bigint[]> {
   if (rows.length === 0) return [];
@@ -135,74 +117,7 @@ export async function saveCanonicalGenresBulk(links: GenreLink[]): Promise<void>
   `;
 }
 
-export async function saveCompany(name: string): Promise<bigint> {
-  const [row] = await db<{ id: string }[]>`
-    INSERT INTO companies (name)
-    VALUES (${name})
-    ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-    RETURNING id
-  `;
-
-  if (row === undefined) {
-    throw new Error(`saveCompany : aucune ligne retournée pour "${name}"`);
-  }
-
-  return BigInt(row.id);
-}
-
-/** Upsert : les rôles sont fusionnés en OR (un rôle déjà vrai le reste). */
-export async function saveGameCompany(
-  canonicalId: bigint,
-  companyId: bigint,
-  roles: GameCompanyCredit
-): Promise<void> {
-  await db`
-    INSERT INTO game_companies (canonical_id, company_id, is_developer, is_publisher, is_porting, is_supporting)
-    VALUES (${canonicalId}, ${companyId}, ${roles.isDeveloper}, ${roles.isPublisher}, ${roles.isPorting}, ${roles.isSupporting})
-    ON CONFLICT (canonical_id, company_id) DO UPDATE SET
-      is_developer = game_companies.is_developer OR EXCLUDED.is_developer,
-      is_publisher = game_companies.is_publisher OR EXCLUDED.is_publisher,
-      is_porting = game_companies.is_porting OR EXCLUDED.is_porting,
-      is_supporting = game_companies.is_supporting OR EXCLUDED.is_supporting
-  `;
-}
-
-export async function saveGenre(name: string): Promise<bigint> {
-  const [row] = await db<{ id: string }[]>`
-    INSERT INTO genres (name)
-    VALUES (${name})
-    ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-    RETURNING id
-  `;
-
-  if (row === undefined) {
-    throw new Error(`saveGenre : aucune ligne retournée pour "${name}"`);
-  }
-
-  return BigInt(row.id);
-}
-
-export async function saveCanonicalGenre(canonicalId: bigint, genreId: bigint): Promise<void> {
-  await db`
-    INSERT INTO canonical_game_genres (canonical_id, genre_id)
-    VALUES (${canonicalId}, ${genreId})
-    ON CONFLICT DO NOTHING
-  `;
-}
-
 export type RelationshipType = "remake_of" | "remaster_of" | "dlc_of" | "edition_of" | "parent";
-
-export async function saveGameRelationship(
-  fromCanonicalId: bigint,
-  toCanonicalId: bigint,
-  type: RelationshipType
-): Promise<void> {
-  await db`
-    INSERT INTO game_relationships (from_canonical_id, to_canonical_id, type)
-    VALUES (${fromCanonicalId}, ${toCanonicalId}, ${type})
-    ON CONFLICT (from_canonical_id, to_canonical_id, type) DO NOTHING
-  `;
-}
 
 export interface RelationshipLink {
   fromCanonicalId: bigint;

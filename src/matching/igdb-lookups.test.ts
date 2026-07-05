@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  relationshipTypeFromGameType,
-  resolveGameStatus,
-  resolveGameTypeLabel,
-} from "./igdb-lookups";
+import { relationshipTypeFromGameType, resolveGameStatus } from "./igdb-lookups";
 
 describe("resolveGameStatus", () => {
   test("[resolveGameStatus] id connu retourne le libellé", () => {
@@ -18,18 +14,6 @@ describe("resolveGameStatus", () => {
 
   test("[resolveGameStatus] id inconnu retourne null", () => {
     expect(resolveGameStatus(999)).toBeNull();
-  });
-});
-
-describe("resolveGameTypeLabel", () => {
-  test("[resolveGameTypeLabel] id connu retourne le libellé", () => {
-    expect(resolveGameTypeLabel(0)).toBe("Main Game");
-    expect(resolveGameTypeLabel(8)).toBe("Remake");
-  });
-
-  test("[resolveGameTypeLabel] null/undefined retourne null", () => {
-    expect(resolveGameTypeLabel(null)).toBeNull();
-    expect(resolveGameTypeLabel(undefined)).toBeNull();
   });
 });
 

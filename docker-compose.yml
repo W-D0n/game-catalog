@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: game_catalog
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - game-catalog-pg-data:/var/lib/postgresql
       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
