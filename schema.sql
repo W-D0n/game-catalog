@@ -30,6 +30,8 @@ CREATE TABLE game_relationships (
     UNIQUE(from_canonical_id, to_canonical_id, type)
 );
 
+CREATE INDEX idx_game_relationships_to_canonical_id ON game_relationships (to_canonical_id);
+
 CREATE TABLE companies (
     id BIGSERIAL PRIMARY KEY,
     name TEXT UNIQUE NOT NULL
@@ -45,6 +47,8 @@ CREATE TABLE game_companies (
     PRIMARY KEY (canonical_id, company_id)
 );
 
+CREATE INDEX idx_game_companies_company_id ON game_companies (company_id);
+
 CREATE TABLE genres (
     id BIGSERIAL PRIMARY KEY,
     name TEXT UNIQUE NOT NULL
@@ -56,6 +60,8 @@ CREATE TABLE canonical_game_genres (
     PRIMARY KEY (canonical_id, genre_id)
 );
 
+CREATE INDEX idx_canonical_game_genres_genre_id ON canonical_game_genres (genre_id);
+
 CREATE TABLE platforms (
     id BIGSERIAL PRIMARY KEY,
     name TEXT UNIQUE NOT NULL
@@ -66,6 +72,8 @@ CREATE TABLE game_platforms (
     platform_id BIGINT REFERENCES platforms(id) ON DELETE CASCADE,
     PRIMARY KEY(game_id, platform_id)
 );
+
+CREATE INDEX idx_game_platforms_platform_id ON game_platforms (platform_id);
 
 CREATE TABLE import_state (
     provider TEXT PRIMARY KEY,
