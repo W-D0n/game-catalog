@@ -37,9 +37,11 @@ Questions ouvertes et idées à traiter.
 - [x] **Specé le 2026-07-06** : [catalog-update-pipeline](specs/catalog-update-pipeline.md)
   — mise à jour incrémentale du catalogue (nouveaux jeux + jeux modifiés),
   non implémenté.
-- [x] **Specé le 2026-07-06** : [cross-platform-library-model](specs/cross-platform-library-model.md)
-  — modèle `owned_games`, matching persisté/incrémental (au lieu du
-  recalcul à l'export actuel), non implémenté.
+- [x] **Implémenté le 2026-07-06** : [cross-platform-library-model](specs/cross-platform-library-model.md)
+  — table `owned_games` + `matchOwnedGames` (incrémental, persisté),
+  `export-steam-library.ts` migré en premier appelant concret. Migration de
+  `steam_library_games`/`steam_player_games` non faite (toujours des tables
+  séparées, cf. spec).
 - [x] **Specé le 2026-07-06** : [archipelago-compatibility](specs/archipelago-compatibility.md)
   — champ dérivé `archipelago: boolean`, scraping liste officielle
   confirmé faisable, accès wiki non vérifié (403 rencontré), non implémenté.
