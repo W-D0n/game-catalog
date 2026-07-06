@@ -2,8 +2,7 @@ import { fetchOwnedGamesForPlayer, fetchPlayerSummary } from "../providers/steam
 import { saveOwnedGames, savePlayer } from "../database/steam-players-repository";
 import { getCanonicalGamesForExport, type CanonicalGameExport } from "../database/canonical-repository";
 import { exportJson } from "../exporters/export-json";
-import { normalizeMatchingTitle } from "../normalizers/matching-title-normalizer";
-import { normalizePlatformName } from "../normalizers/platform-normalizer";
+import { buildCanonicalTitleIndex, matchTitleToCanonical } from "../matching/canonical-title-lookup";
 
 export interface CrossedGameEntry {
   appId: number;
@@ -11,10 +10,6 @@ export interface CrossedGameEntry {
   ownerCount: number;
   owners: string[];
   canonicalGame: CanonicalGameExport | null;
-}
-
-function isPcCandidate(game: CanonicalGameExport): boolean {
-  return game.platforms.some((p) => normalizePlatformName(p) === "PC");
 }
 
 /**
@@ -67,28 +62,20 @@ export async function crossSteamLibraries(steamIds: string[], threshold?: number
   for (const message of excluded) console.log(`  ${message}`);
 
   const canonicalGames = await getCanonicalGamesForExport();
-  const canonicalByTitle = new Map<string, CanonicalGameExport[]>();
-  for (const game of canonicalGames) {
-    const key = normalizeMatchingTitle(game.title);
-    if (!canonicalByTitle.has(key)) canonicalByTitle.set(key, []);
-    canonicalByTitle.get(key)!.push(game);
-  }
+  const titleIndex = buildCanonicalTitleIndex(canonicalGames);
 
   const entries: CrossedGameEntry[] = [];
   for (const [appId, { name, owners }] of ownersByAppId) {
     if (owners.size < effectiveThreshold) continue;
 
-    const key = normalizeMatchingTitle(name);
-    const candidates = canonicalByTitle.get(key) ?? [];
-    const pcCandidates = candidates.filter(isPcCandidate);
-    const chosen = pcCandidates[0] ?? candidates[0] ?? null;
+    const { canonicalGame } = matchTitleToCanonical(titleIndex, name);
 
     entries.push({
       appId,
       steamName: name,
       ownerCount: owners.size,
       owners: [...owners],
-      canonicalGame: chosen,
+      canonicalGame,
     });
   }
 

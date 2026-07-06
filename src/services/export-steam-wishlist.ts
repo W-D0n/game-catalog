@@ -1,8 +1,7 @@
 import { fetchSteamWishlist } from "../providers/steam/steam-wishlist-client";
 import { getCanonicalGamesForExport, type CanonicalGameExport } from "../database/canonical-repository";
 import { exportJson } from "../exporters/export-json";
-import { normalizeMatchingTitle } from "../normalizers/matching-title-normalizer";
-import { normalizePlatformName } from "../normalizers/platform-normalizer";
+import { buildCanonicalTitleIndex, matchTitleToCanonical } from "../matching/canonical-title-lookup";
 
 export interface SteamWishlistExportEntry {
   appId: number;
@@ -10,10 +9,6 @@ export interface SteamWishlistExportEntry {
   matched: boolean;
   ambiguousCandidates: number;
   canonicalGame: CanonicalGameExport | null;
-}
-
-function isPcCandidate(game: CanonicalGameExport): boolean {
-  return game.platforms.some((p) => normalizePlatformName(p) === "PC");
 }
 
 /**
@@ -26,38 +21,17 @@ export async function exportSteamWishlist(): Promise<void> {
   console.log(`Steam : ${wishlistGames.length} jeux dans la wishlist.`);
 
   const canonicalGames = await getCanonicalGamesForExport();
-
-  const canonicalByTitle = new Map<string, CanonicalGameExport[]>();
-  for (const game of canonicalGames) {
-    const key = normalizeMatchingTitle(game.title);
-    if (!canonicalByTitle.has(key)) canonicalByTitle.set(key, []);
-    canonicalByTitle.get(key)!.push(game);
-  }
+  const titleIndex = buildCanonicalTitleIndex(canonicalGames);
 
   const entries: SteamWishlistExportEntry[] = wishlistGames.map((wishlistGame) => {
-    const key = normalizeMatchingTitle(wishlistGame.name);
-    const candidates = canonicalByTitle.get(key) ?? [];
-
-    if (candidates.length === 0) {
-      return {
-        appId: wishlistGame.appId,
-        steamName: wishlistGame.name,
-        matched: false,
-        ambiguousCandidates: 0,
-        canonicalGame: null,
-      };
-    }
-
-    const pcCandidates = candidates.filter(isPcCandidate);
-    const chosen = pcCandidates[0] ?? candidates[0]!;
-    const ambiguousCandidates = candidates.length - 1;
+    const result = matchTitleToCanonical(titleIndex, wishlistGame.name);
 
     return {
       appId: wishlistGame.appId,
       steamName: wishlistGame.name,
-      matched: true,
-      ambiguousCandidates,
-      canonicalGame: chosen,
+      matched: result.matched,
+      ambiguousCandidates: result.ambiguousCandidates,
+      canonicalGame: result.canonicalGame,
     };
   });
 
