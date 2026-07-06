@@ -1,5 +1,4 @@
 import { fetchSteamLibrary } from "../providers/steam/steam-library-client";
-import { saveLibraryGame } from "../database/steam-library-repository";
 import { saveOwnedGame, getOwnedGamesByPlatform } from "../database/owned-games-repository";
 import { matchOwnedGames } from "./match-owned-games";
 import { getCanonicalGamesForExport, type CanonicalGameExport } from "../database/canonical-repository";
@@ -20,17 +19,12 @@ export interface SteamLibraryExportEntry {
  * matching titre → canonical game est persisté dans `owned_games`
  * (`matchOwnedGames`, incrémental) plutôt que recalculé à chaque export —
  * voir docs/specs/cross-platform-library-model.md.
- *
- * Écrit toujours dans `steam_library_games` en parallèle : `enrich-rawg-library.ts`
- * en dépend encore pour son propre usage (lookup de titres, sans matching
- * canonique), migration non faite ici (cf. spec, lacunes).
  */
 export async function exportSteamLibrary(): Promise<void> {
   const steamGames = await fetchSteamLibrary();
   console.log(`Steam : ${steamGames.length} jeux dans la bibliothèque.`);
 
   for (const game of steamGames) {
-    await saveLibraryGame(game);
     await saveOwnedGame("steam", String(game.appId), game.name);
   }
 

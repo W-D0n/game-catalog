@@ -76,17 +76,16 @@ CREATE TABLE owned_games (
 CREATE INDEX idx_owned_games_canonical_id ON owned_games (canonical_id);
 ```
 
-> **Migration** : `steam_library_games` (bibliothèque personnelle, en prod)
-> et `steam_player_games` (croisement multi-utilisateurs, en prod) sont deux
-> préoccupations distinctes de `owned_games` :
-> - `steam_library_games` est un cas particulier de `owned_games`
->   (`platform='steam'`, un seul propriétaire — moi). Migration possible à
->   terme, mais **non détaillée ici** (script de migration, compatibilité
->   avec `enrich-rawg-library.ts`/`export-steam-library.ts` existants —
->   cf. lacunes).
-> - `steam_player_games` sert au croisement entre comptes tiers, pas à ma
->   bibliothèque de référence — reste distinct pour l'instant, pourrait
->   migrer plus tard si le besoin de média par jeu croisé se confirme.
+> **Migration `steam_library_games` → `owned_games` : FAITE (2026-07-06).**
+> `enrich-rawg-library.ts` et `export-steam-library.ts` lisent/écrivent
+> désormais `owned_games` (`platform='steam'`) directement — l'ancienne
+> table `steam_library_games` a été droppée (données déjà dupliquées dans
+> `owned_games`, vérifié 512/512 avant suppression).
+>
+> `steam_player_games` reste **volontairement distinct** : il sert au
+> croisement entre comptes tiers (multi-utilisateurs), pas à ma
+> bibliothèque de référence — une notion différente de "ce que je possède".
+> Pourrait migrer plus tard si le besoin de média par jeu croisé se confirme.
 
 ## 5. Algorithme de matching (persistant, incrémental)
 
@@ -116,9 +115,10 @@ chargement). **Écrit** `owned_games.canonical_id`.
 
 ## 8. Lacunes identifiées
 
-- [ ] **Migration concrète de `steam_library_games`/`steam_player_games`
-  vers `owned_games`** non détaillée (script, compatibilité descendante
-  avec `enrich-rawg-library.ts`) — à faire au moment de l'implémentation.
+- [x] **Migration de `steam_library_games` vers `owned_games` : FAITE
+  (2026-07-06)** — `enrich-rawg-library.ts`/`export-steam-library.ts`
+  migrés, ancienne table droppée. `steam_player_games` reste distinct
+  (voir §4, notion différente — croisement entre tiers, pas ma bibliothèque).
 - [ ] **GOG/Epic/Itch.io** : aucun provider n'existe encore (idée séparée
   dans l'inbox). `owned_games` est conçu pour les accueillir mais
   l'implémentation des clients API de ces plateformes reste hors scope ici.

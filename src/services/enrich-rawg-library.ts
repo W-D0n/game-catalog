@@ -1,5 +1,5 @@
 import { fetchSteamLibrary } from "../providers/steam/steam-library-client";
-import { saveLibraryGame, getLibraryGames } from "../database/steam-library-repository";
+import { saveOwnedGame, getOwnedGamesByPlatform } from "../database/owned-games-repository";
 import { getGameIdentitiesBySource } from "../database/game-repository";
 import { fetchDevelopmentTeam } from "../providers/rawg/rawg-development-team-client";
 import { saveGameCredits, getGameIdsWithCredits } from "../database/rawg-credits-repository";
@@ -19,11 +19,11 @@ export async function enrichRawgLibrary(): Promise<void> {
   console.log(`Steam : ${steamGames.length} jeux dans la bibliothèque.`);
 
   for (const game of steamGames) {
-    await saveLibraryGame(game);
+    await saveOwnedGame("steam", String(game.appId), game.name);
   }
 
-  const libraryGames = await getLibraryGames();
-  const libraryTitles = new Set(libraryGames.map((g) => normalizeMatchingTitle(g.name)));
+  const libraryGames = await getOwnedGamesByPlatform("steam");
+  const libraryTitles = new Set(libraryGames.map((g) => normalizeMatchingTitle(g.rawTitle)));
 
   const rawgGames = await getGameIdentitiesBySource("rawg");
   const matches = rawgGames.filter((game) =>

@@ -89,16 +89,10 @@ CREATE TABLE import_state (
     last_cursor BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE TABLE steam_library_games (
-    app_id BIGINT PRIMARY KEY,
-    name TEXT NOT NULL,
-    fetched_at TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
 -- Croisement de bibliothèques Steam multi-utilisateurs (voir
--- docs/specs/steam-library-crossing.md). Distinct de steam_library_games
--- (bibliothèque personnelle unique, déjà en prod) pour ne pas risquer de
--- régression sur enrich-rawg-library.ts / export-steam-library.ts.
+-- docs/specs/steam-library-crossing.md). Distinct de owned_games (ma
+-- bibliothèque de référence) : ici il s'agit des bibliothèques d'AUTRES
+-- comptes, comparées entre elles, pas possédées par moi.
 CREATE TABLE steam_players (
     steam_id64 TEXT PRIMARY KEY,
     persona_name TEXT NOT NULL,
@@ -116,7 +110,8 @@ CREATE TABLE steam_player_games (
 -- Bibliothèque possédée cross-plateforme (voir
 -- docs/specs/cross-platform-library-model.md). Matching persisté vers
 -- canonical_games une fois pour toutes (matchOwnedGames), contrairement
--- au recalcul en mémoire fait auparavant par chaque export.
+-- au recalcul en mémoire fait auparavant par chaque export. Remplace
+-- l'ancienne steam_library_games (migrée le 2026-07-06).
 CREATE TABLE owned_games (
     id BIGSERIAL PRIMARY KEY,
     platform TEXT NOT NULL,

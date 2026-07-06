@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { exportSteamLibrary } from "./export-steam-library";
-import { saveLibraryGame } from "../database/steam-library-repository";
 import { createCanonicalGamesBulk, linkGamesToCanonicalBulk } from "../database/canonical-repository";
 import { saveGame } from "../database/game-repository";
 import { savePlatforms } from "../database/platform-repository";
