@@ -30,3 +30,19 @@ Questions ouvertes et idées à traiter.
   depuis le curseur 5560 retourne bien Vandal Hearts et Golden Axe.
   **Reste à faire** : un nouveau crawl IGDB complet pour combler les trous
   existants (~1-2h, non lancé — décision à prendre séparément).
+
+- fetch mes jeux possédés sur les stores GOG, Epic Game store, Itchio —
+  couvert en partie par [cross-platform-library-model](specs/cross-platform-library-model.md)
+  (modèle `owned_games` conçu pour les accueillir), clients providers pas encore écrits.
+- [x] **Specé le 2026-07-06** : [catalog-update-pipeline](specs/catalog-update-pipeline.md)
+  — mise à jour incrémentale du catalogue (nouveaux jeux + jeux modifiés),
+  non implémenté.
+- [x] **Specé le 2026-07-06** : [cross-platform-library-model](specs/cross-platform-library-model.md)
+  — modèle `owned_games`, matching persisté/incrémental (au lieu du
+  recalcul à l'export actuel), non implémenté.
+- [x] **Specé le 2026-07-06** : [archipelago-compatibility](specs/archipelago-compatibility.md)
+  — champ dérivé `archipelago: boolean`, scraping liste officielle
+  confirmé faisable, accès wiki non vérifié (403 rencontré), non implémenté.
+- [x] **Specé le 2026-07-06** : [myvault-integration](specs/myvault-integration.md)
+  — contrat côté game-catalog, mode de transport (DB directe / export JSON
+  / API) explicitement non tranché, bloquant tant que la stack MyVault n'est pas connue.
