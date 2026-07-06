@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { countGames, getGamesBySource, saveGame } from "./game-repository";
+import { countGames, getGamesBySource, resetCanonicalLinkBulk, saveGame } from "./game-repository";
+import { createCanonicalGamesBulk, linkGamesToCanonicalBulk } from "./canonical-repository";
 import { savePlatforms } from "./platform-repository";
 import { resetDatabase } from "./test-helpers";
 import { db } from "./db";
@@ -186,5 +187,44 @@ describe("countGames", () => {
     await saveGame(buildGame({ source: "igdb", sourceId: "2" }));
 
     expect(await countGames()).toBe(2);
+  });
+});
+
+describe("resetCanonicalLinkBulk", () => {
+  test("[resetCanonicalLinkBulk] remet canonical_id à NULL pour les jeux donnés", async () => {
+    const gameId = await saveGame(buildGame({}));
+    const [canonicalId] = await createCanonicalGamesBulk([
+      { title: "GTA V", releaseYear: 2013, releaseStatus: null },
+    ]);
+    await linkGamesToCanonicalBulk([{ gameId, canonicalId: canonicalId! }]);
+
+    await resetCanonicalLinkBulk([gameId]);
+
+    const [row] = await db<{ canonical_id: string | null }[]>`SELECT canonical_id FROM games WHERE id = ${gameId}`;
+    expect(row?.canonical_id).toBeNull();
+  });
+
+  test("[resetCanonicalLinkBulk] ne touche pas les jeux absents de la liste", async () => {
+    const gameIdA = await saveGame(buildGame({ sourceId: "1" }));
+    const gameIdB = await saveGame(buildGame({ sourceId: "2" }));
+    const [canonicalId] = await createCanonicalGamesBulk([
+      { title: "GTA V", releaseYear: 2013, releaseStatus: null },
+    ]);
+    await linkGamesToCanonicalBulk([
+      { gameId: gameIdA, canonicalId: canonicalId! },
+      { gameId: gameIdB, canonicalId: canonicalId! },
+    ]);
+
+    await resetCanonicalLinkBulk([gameIdA]);
+
+    const rows = await db<{ id: string; canonical_id: string | null }[]>`
+      SELECT id, canonical_id FROM games WHERE id IN (${gameIdA}, ${gameIdB}) ORDER BY id
+    `;
+    expect(rows.find((r) => BigInt(r.id) === gameIdA)?.canonical_id).toBeNull();
+    expect(rows.find((r) => BigInt(r.id) === gameIdB)?.canonical_id).not.toBeNull();
+  });
+
+  test("[resetCanonicalLinkBulk] tableau vide ne fait rien", async () => {
+    await expect(resetCanonicalLinkBulk([])).resolves.toBeUndefined();
   });
 });

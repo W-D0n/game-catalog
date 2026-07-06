@@ -16,6 +16,22 @@ export async function saveLastCursor(provider: string, cursor: number): Promise<
   `;
 }
 
+/** Timestamp unix du dernier sweep incrémental réussi — `null` si jamais exécuté (voir catalog-update-pipeline). */
+export async function getLastUpdateCheck(provider: string): Promise<number | null> {
+  const [row] = await db<{ last_update_check: string | null }[]>`
+    SELECT last_update_check FROM import_state WHERE provider = ${provider}
+  `;
+  return row?.last_update_check ? Number(row.last_update_check) : null;
+}
+
+export async function saveLastUpdateCheck(provider: string, timestamp: number): Promise<void> {
+  await db`
+    INSERT INTO import_state (provider, last_update_check)
+    VALUES (${provider}, ${timestamp})
+    ON CONFLICT (provider) DO UPDATE SET last_update_check = EXCLUDED.last_update_check
+  `;
+}
+
 export interface ImportState {
   provider: string;
   lastCursor: number;

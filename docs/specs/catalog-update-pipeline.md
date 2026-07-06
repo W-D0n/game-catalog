@@ -1,6 +1,7 @@
 # Spec — Pipeline de mise à jour incrémentale du catalogue
 
-> **Statut : CONCEPTION.** Pas de code écrit.
+> **Statut : IMPLÉMENTÉ pour IGDB (2026-07-06).** RAWG reste différé (quota
+> bloqué jusqu'au 2026-08-01, mécanisme de filtre par date non vérifié).
 
 ## 1. Problème
 
@@ -91,10 +92,11 @@ jeux qu'il vient lui-même de modifier), jamais un reset en masse.
 
 ## 7. Lacunes identifiées
 
-- [ ] **IGDB : présence et fiabilité du champ `updated_at`** sur l'endpoint
-  `games` non vérifiées en conditions réelles — à confirmer avant
-  implémentation (ajouter `updated_at` aux champs fetchés, vérifier que
-  `where updated_at > X` se comporte comme attendu).
+- [x] **IGDB : `updated_at` vérifié en conditions réelles (2026-07-06)** —
+  champ présent, `where updated_at > X & id > Y` filtre et pagine
+  correctement. `IgdbProvider.fetchUpdatedSince` implémenté. Sweep live
+  testé avec une fenêtre de 2h : 2143 jeux modifiés détectés, ré-enrichis
+  avec succès (1849 nouveaux canonical games, 290 étendus).
 - [ ] **RAWG : mécanisme de filtre par date de mise à jour** non vérifié —
   le champ `updated` existe dans les réponses documentées, mais un filtre
   serveur dédié (`ordering=-updated` vs un paramètre `updated_since`) reste

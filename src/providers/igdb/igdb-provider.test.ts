@@ -244,3 +244,50 @@ describe("IgdbProvider.fetchPage", () => {
     await expect(new IgdbProvider().fetchPage(0)).rejects.toThrow(ProviderError);
   });
 });
+
+describe("IgdbProvider.fetchUpdatedSince", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  test("[fetchUpdatedSince] requête filtre par updated_at ET id, jamais offset", async () => {
+    let gamesRequestBody: string | undefined;
+
+    global.fetch = ((_url: string, init?: RequestInit) => {
+      const isTokenRequest = String(init?.body ?? "").includes("grant_type");
+      if (isTokenRequest) return Promise.resolve(tokenResponse());
+      gamesRequestBody = String(init?.body);
+      return Promise.resolve(new Response("[]", { status: 200 }));
+    }) as unknown as typeof fetch;
+
+    await new IgdbProvider().fetchUpdatedSince(1700000000, 42);
+
+    expect(gamesRequestBody).toContain("where updated_at > 1700000000 & id > 42");
+    expect(gamesRequestBody).not.toContain("offset");
+  });
+
+  test("[fetchUpdatedSince] réponse conforme mappée en Game[], nextCursor = max id du lot", async () => {
+    global.fetch = mockFetchSequence([
+      tokenResponse(),
+      new Response(
+        JSON.stringify([{ id: 55, slug: "updated-game", name: "Jeu Mis à Jour" }]),
+        { status: 200 }
+      ),
+    ]);
+
+    const result = await new IgdbProvider().fetchUpdatedSince(1700000000, 0);
+
+    expect(result.games[0]?.title).toBe("Jeu Mis à Jour");
+    expect(result.nextCursor).toBe(55);
+  });
+
+  test("[fetchUpdatedSince] tableau vide retourne games=[] et nextCursor inchangé", async () => {
+    global.fetch = mockFetchSequence([tokenResponse(), new Response("[]", { status: 200 })]);
+
+    const result = await new IgdbProvider().fetchUpdatedSince(1700000000, 42);
+
+    expect(result).toEqual({ games: [], nextCursor: 42 });
+  });
+});

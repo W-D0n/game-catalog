@@ -18,6 +18,7 @@
     "export-steam-library": "bun run src/export-steam-library.ts",
     "export-steam-wishlist": "bun run src/export-steam-wishlist.ts",
     "cross-steam-libraries": "bun run src/cross-steam-libraries.ts",
+    "sweep-igdb": "bun run src/sweep-igdb.ts",
     "test": "bun test"
   },
   "dependencies": {

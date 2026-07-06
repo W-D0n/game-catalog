@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { getAllImportStates, getLastCursor, saveLastCursor } from "./import-state-repository";
+import {
+  getAllImportStates,
+  getLastCursor,
+  getLastUpdateCheck,
+  saveLastCursor,
+  saveLastUpdateCheck,
+} from "./import-state-repository";
 import { resetDatabase } from "./test-helpers";
 
 beforeEach(async () => {
@@ -32,6 +38,27 @@ describe("saveLastCursor", () => {
 
     expect(await getLastCursor("rawg")).toBe(100);
     expect(await getLastCursor("igdb")).toBe(5);
+  });
+});
+
+describe("getLastUpdateCheck / saveLastUpdateCheck", () => {
+  test("[getLastUpdateCheck] provider inconnu retourne null (jamais sweepé)", async () => {
+    expect(await getLastUpdateCheck("igdb")).toBeNull();
+  });
+
+  test("[saveLastUpdateCheck] rejouer avec une nouvelle valeur fait un upsert", async () => {
+    await saveLastUpdateCheck("igdb", 1000);
+    await saveLastUpdateCheck("igdb", 2000);
+
+    expect(await getLastUpdateCheck("igdb")).toBe(2000);
+  });
+
+  test("[saveLastUpdateCheck] indépendant de last_cursor sur le même provider", async () => {
+    await saveLastCursor("igdb", 409040);
+    await saveLastUpdateCheck("igdb", 1000);
+
+    expect(await getLastCursor("igdb")).toBe(409040);
+    expect(await getLastUpdateCheck("igdb")).toBe(1000);
   });
 });
 

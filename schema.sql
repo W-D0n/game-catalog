@@ -84,9 +84,13 @@ CREATE INDEX idx_game_platforms_platform_id ON game_platforms (platform_id);
 
 -- last_cursor : sémantique définie par chaque provider (RAWG : dernier
 -- numéro de page complété ; IGDB : dernier id vu, pagination par curseur).
+-- last_update_check (voir docs/specs/catalog-update-pipeline.md) : timestamp
+-- unix du dernier sweep incrémental réussi (NULL = jamais) — distinct du
+-- curseur de backfill, qui reste figé une fois le backfill terminé.
 CREATE TABLE import_state (
     provider TEXT PRIMARY KEY,
-    last_cursor BIGINT NOT NULL DEFAULT 0
+    last_cursor BIGINT NOT NULL DEFAULT 0,
+    last_update_check BIGINT
 );
 
 -- Croisement de bibliothèques Steam multi-utilisateurs (voir

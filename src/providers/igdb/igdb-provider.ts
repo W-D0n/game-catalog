@@ -113,7 +113,7 @@ async function fetchAccessToken(): Promise<string> {
  */
 async function fetchPageWithRetry(
   token: string,
-  lastId: number,
+  whereClause: string,
   attemptLabel: string
 ): Promise<IgdbGame[]> {
   let lastError = "inconnu";
@@ -127,7 +127,7 @@ async function fetchPageWithRetry(
           Authorization: `Bearer ${token}`,
           "Content-Type": "text/plain",
         },
-        body: `fields ${IGDB_FIELDS}; where id > ${lastId}; sort id asc; limit ${PAGE_SIZE};`,
+        body: `fields ${IGDB_FIELDS}; ${whereClause}; sort id asc; limit ${PAGE_SIZE};`,
       });
 
       if (response.ok) {
@@ -175,6 +175,40 @@ async function fetchPageWithRetry(
   );
 }
 
+function mapIgdbGames(games: IgdbGame[]): FetchPageResult["games"] {
+  return games.map((game) => ({
+    source: "igdb",
+    sourceId: String(game.id),
+    title: game.name,
+    releaseYear: game.first_release_date
+      ? new Date(game.first_release_date * 1000).getUTCFullYear()
+      : null,
+    platforms: game.platforms?.map((p) => p.name) ?? [],
+    slug: game.slug,
+    rawMetadata: {
+      genres: game.genres?.map((g) => g.name),
+      companies: game.involved_companies
+        ?.filter((ic) => ic.company !== undefined)
+        .map((ic) => ({
+          name: ic.company!.name,
+          isDeveloper: ic.developer ?? false,
+          isPublisher: ic.publisher ?? false,
+          isPorting: ic.porting ?? false,
+          isSupporting: ic.supporting ?? false,
+        })),
+      gameType: game.game_type ?? null,
+      gameStatus: game.game_status ?? null,
+      parentGame: game.parent_game ?? null,
+      versionParent: game.version_parent ?? null,
+      coverUrl: game.cover ? toIgdbImageUrl(game.cover.url, "t_cover_big") : null,
+      screenshotUrls: game.screenshots?.map((s) => toIgdbImageUrl(s.url, "t_screenshot_big")),
+      videoIds: game.videos?.map((v) => v.video_id),
+      summary: game.summary ?? null,
+      storyline: game.storyline ?? null,
+    },
+  }));
+}
+
 export class IgdbProvider implements GameProvider {
   readonly name = "igdb";
   private tokenPromise: Promise<string> | null = null;
@@ -189,46 +223,34 @@ export class IgdbProvider implements GameProvider {
     await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
 
     const token = await this.getToken();
-    const games = await fetchPageWithRetry(token, cursor, `curseur ${cursor}`);
+    const games = await fetchPageWithRetry(token, `where id > ${cursor}`, `curseur ${cursor}`);
 
     if (games.length === 0) {
       return { games: [], nextCursor: cursor };
     }
 
     const nextCursor = Math.max(...games.map((g) => g.id));
+    return { games: mapIgdbGames(games), nextCursor };
+  }
 
-    const mapped = games.map((game) => ({
-      source: "igdb",
-      sourceId: String(game.id),
-      title: game.name,
-      releaseYear: game.first_release_date
-        ? new Date(game.first_release_date * 1000).getUTCFullYear()
-        : null,
-      platforms: game.platforms?.map((p) => p.name) ?? [],
-      slug: game.slug,
-      rawMetadata: {
-        genres: game.genres?.map((g) => g.name),
-        companies: game.involved_companies
-          ?.filter((ic) => ic.company !== undefined)
-          .map((ic) => ({
-            name: ic.company!.name,
-            isDeveloper: ic.developer ?? false,
-            isPublisher: ic.publisher ?? false,
-            isPorting: ic.porting ?? false,
-            isSupporting: ic.supporting ?? false,
-          })),
-        gameType: game.game_type ?? null,
-        gameStatus: game.game_status ?? null,
-        parentGame: game.parent_game ?? null,
-        versionParent: game.version_parent ?? null,
-        coverUrl: game.cover ? toIgdbImageUrl(game.cover.url, "t_cover_big") : null,
-        screenshotUrls: game.screenshots?.map((s) => toIgdbImageUrl(s.url, "t_screenshot_big")),
-        videoIds: game.videos?.map((v) => v.video_id),
-        summary: game.summary ?? null,
-        storyline: game.storyline ?? null,
-      },
-    }));
+  /**
+   * Jeux modifiés côté IGDB depuis `sinceTimestamp` (unix seconds), paginés
+   * par id (`lastSeenId`) — voir docs/specs/catalog-update-pipeline.md.
+   * Distinct de `fetchPage` : capte les jeux déjà connus dont les métadonnées
+   * ont changé, pas les nouveaux jeux (déjà couverts par `fetchPage`).
+   */
+  async fetchUpdatedSince(sinceTimestamp: number, lastSeenId: number): Promise<FetchPageResult> {
+    await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
 
-    return { games: mapped, nextCursor };
+    const token = await this.getToken();
+    const whereClause = `where updated_at > ${sinceTimestamp} & id > ${lastSeenId}`;
+    const games = await fetchPageWithRetry(token, whereClause, `sweep depuis ${sinceTimestamp}, curseur ${lastSeenId}`);
+
+    if (games.length === 0) {
+      return { games: [], nextCursor: lastSeenId };
+    }
+
+    const nextCursor = Math.max(...games.map((g) => g.id));
+    return { games: mapIgdbGames(games), nextCursor };
   }
 }

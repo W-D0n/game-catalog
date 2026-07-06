@@ -34,14 +34,16 @@ Questions ouvertes et idées à traiter.
 - fetch mes jeux possédés sur les stores GOG, Epic Game store, Itchio —
   couvert en partie par [cross-platform-library-model](specs/cross-platform-library-model.md)
   (modèle `owned_games` conçu pour les accueillir), clients providers pas encore écrits.
-- [x] **Specé le 2026-07-06** : [catalog-update-pipeline](specs/catalog-update-pipeline.md)
-  — mise à jour incrémentale du catalogue (nouveaux jeux + jeux modifiés),
-  non implémenté.
+- [x] **Implémenté le 2026-07-06 (IGDB)** : [catalog-update-pipeline](specs/catalog-update-pipeline.md)
+  — `IgdbProvider.fetchUpdatedSince` + `runIgdbUpdateSweep` (`bun run sweep-igdb`).
+  Vérifié en direct : 2143 jeux modifiés détectés sur une fenêtre de 2h,
+  ré-enrichis (1849 nouveaux canonical games, 290 étendus). RAWG différé
+  (quota bloqué jusqu'au 2026-08-01, mécanisme non vérifié).
 - [x] **Implémenté le 2026-07-06** : [cross-platform-library-model](specs/cross-platform-library-model.md)
   — table `owned_games` + `matchOwnedGames` (incrémental, persisté),
-  `export-steam-library.ts` migré en premier appelant concret. Migration de
-  `steam_library_games`/`steam_player_games` non faite (toujours des tables
-  séparées, cf. spec).
+  `export-steam-library.ts`/`enrich-rawg-library.ts` migrés,
+  `steam_library_games` droppée. `steam_player_games` reste distinct
+  (croisement entre tiers, notion différente).
 - [x] **Specé le 2026-07-06** : [archipelago-compatibility](specs/archipelago-compatibility.md)
   — champ dérivé `archipelago: boolean`, scraping liste officielle
   confirmé faisable, accès wiki non vérifié (403 rencontré), non implémenté.

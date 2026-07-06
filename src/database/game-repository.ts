@@ -54,6 +54,20 @@ export async function getGamesBySource(source: string): Promise<Game[]> {
   }));
 }
 
+/**
+ * Remet canonical_id à NULL pour des jeux modifiés (sweep incrémental) —
+ * force leur ré-enrichissement par build-canonical-projection.ts, qui ne
+ * retraite que `canonical_id IS NULL` par design. Voir
+ * docs/specs/catalog-update-pipeline.md §5 : effet de bord assumé,
+ * réservé au sweep, jamais un reset en masse.
+ */
+export async function resetCanonicalLinkBulk(gameIds: bigint[]): Promise<void> {
+  if (gameIds.length === 0) return;
+
+  const ids = db.array(gameIds.map(String), "BIGINT");
+  await db`UPDATE games SET canonical_id = NULL WHERE id = ANY(${ids})`;
+}
+
 export async function countGames(): Promise<number> {
   const [row] = await db<{ count: string }[]>`
     SELECT COUNT(*) AS count FROM games
