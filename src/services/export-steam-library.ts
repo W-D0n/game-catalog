@@ -1,9 +1,10 @@
 import { fetchSteamLibrary } from "../providers/steam/steam-library-client";
-import { saveLibraryGame, getLibraryGames } from "../database/steam-library-repository";
+import { saveLibraryGame } from "../database/steam-library-repository";
+import { saveOwnedGame, getOwnedGamesByPlatform } from "../database/owned-games-repository";
+import { matchOwnedGames } from "./match-owned-games";
 import { getCanonicalGamesForExport, type CanonicalGameExport } from "../database/canonical-repository";
 import { exportJson } from "../exporters/export-json";
-import { normalizeMatchingTitle } from "../normalizers/matching-title-normalizer";
-import { normalizePlatformName } from "../normalizers/platform-normalizer";
+import { buildCanonicalTitleIndex, matchTitleToCanonical } from "../matching/canonical-title-lookup";
 
 export interface SteamLibraryExportEntry {
   appId: number;
@@ -13,16 +14,16 @@ export interface SteamLibraryExportEntry {
   canonicalGame: CanonicalGameExport | null;
 }
 
-function isPcCandidate(game: CanonicalGameExport): boolean {
-  return game.platforms.some((p) => normalizePlatformName(p) === "PC");
-}
-
 /**
  * Rafraîchit la bibliothèque Steam puis l'enrichit avec les données du
- * catalogue canonique (genres, sociétés, plateformes, relations), par
- * correspondance de titre normalisé. Les jeux Steam sont toujours PC —
- * utilisé pour désambiguïser quand plusieurs canonical games partagent le
- * même titre normalisé (ex. plusieurs jeux nommés "Chess").
+ * catalogue canonique (genres, sociétés, plateformes, relations). Le
+ * matching titre → canonical game est persisté dans `owned_games`
+ * (`matchOwnedGames`, incrémental) plutôt que recalculé à chaque export —
+ * voir docs/specs/cross-platform-library-model.md.
+ *
+ * Écrit toujours dans `steam_library_games` en parallèle : `enrich-rawg-library.ts`
+ * en dépend encore pour son propre usage (lookup de titres, sans matching
+ * canonique), migration non faite ici (cf. spec, lacunes).
  */
 export async function exportSteamLibrary(): Promise<void> {
   const steamGames = await fetchSteamLibrary();
@@ -30,45 +31,28 @@ export async function exportSteamLibrary(): Promise<void> {
 
   for (const game of steamGames) {
     await saveLibraryGame(game);
+    await saveOwnedGame("steam", String(game.appId), game.name);
   }
 
-  const libraryGames = await getLibraryGames();
+  await matchOwnedGames();
+
+  const ownedGames = await getOwnedGamesByPlatform("steam");
   const canonicalGames = await getCanonicalGamesForExport();
+  const canonicalById = new Map(canonicalGames.map((g) => [g.id, g]));
+  const titleIndex = buildCanonicalTitleIndex(canonicalGames);
 
-  const canonicalByTitle = new Map<string, CanonicalGameExport[]>();
-  for (const game of canonicalGames) {
-    const key = normalizeMatchingTitle(game.title);
-    if (!canonicalByTitle.has(key)) canonicalByTitle.set(key, []);
-    canonicalByTitle.get(key)!.push(game);
-  }
-
-  const entries: SteamLibraryExportEntry[] = libraryGames.map((steamGame) => {
-    const key = normalizeMatchingTitle(steamGame.name);
-    const candidates = canonicalByTitle.get(key) ?? [];
-
-    if (candidates.length === 0) {
-      return {
-        appId: steamGame.appId,
-        steamName: steamGame.name,
-        matched: false,
-        ambiguousCandidates: 0,
-        canonicalGame: null,
-      };
-    }
-
-    const pcCandidates = candidates.filter(isPcCandidate);
-    const chosen = pcCandidates[0] ?? candidates[0]!;
-    // Nombre total d'autres canonical games partageant ce titre, que la
-    // désambiguïsation par plateforme PC ait tranché ou non — signal de
-    // transparence pour l'utilisateur de l'export.
-    const ambiguousCandidates = candidates.length - 1;
+  const entries: SteamLibraryExportEntry[] = ownedGames.map((owned) => {
+    const canonicalGame = owned.canonicalId ? (canonicalById.get(owned.canonicalId.toString()) ?? null) : null;
+    // Recalculé uniquement pour l'information de transparence (nombre de candidats
+    // concurrents) — la décision de matching elle-même est déjà persistée, pas recalculée.
+    const { ambiguousCandidates } = matchTitleToCanonical(titleIndex, owned.rawTitle);
 
     return {
-      appId: steamGame.appId,
-      steamName: steamGame.name,
-      matched: true,
+      appId: Number(owned.externalId),
+      steamName: owned.rawTitle,
+      matched: canonicalGame !== null,
       ambiguousCandidates,
-      canonicalGame: chosen,
+      canonicalGame,
     };
   });
 

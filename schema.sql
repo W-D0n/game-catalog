@@ -113,6 +113,22 @@ CREATE TABLE steam_player_games (
     PRIMARY KEY (steam_id64, app_id)
 );
 
+-- Bibliothèque possédée cross-plateforme (voir
+-- docs/specs/cross-platform-library-model.md). Matching persisté vers
+-- canonical_games une fois pour toutes (matchOwnedGames), contrairement
+-- au recalcul en mémoire fait auparavant par chaque export.
+CREATE TABLE owned_games (
+    id BIGSERIAL PRIMARY KEY,
+    platform TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    raw_title TEXT NOT NULL,
+    canonical_id BIGINT REFERENCES canonical_games(id) ON DELETE SET NULL,
+    fetched_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE(platform, external_id)
+);
+
+CREATE INDEX idx_owned_games_canonical_id ON owned_games (canonical_id);
+
 CREATE TABLE rawg_game_credits (
     id BIGSERIAL PRIMARY KEY,
     game_id BIGINT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
