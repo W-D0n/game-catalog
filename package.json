@@ -16,6 +16,7 @@
     "build-canonical": "bun run src/build-canonical-projection.ts",
     "export-canonical": "bun run src/export-canonical.ts",
     "export-steam-library": "bun run src/export-steam-library.ts",
+    "export-itchio-library": "bun run src/export-itchio-library.ts",
     "export-steam-wishlist": "bun run src/export-steam-wishlist.ts",
     "cross-steam-libraries": "bun run src/cross-steam-libraries.ts",
     "sweep-igdb": "bun run src/sweep-igdb.ts",
