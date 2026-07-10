@@ -128,6 +128,20 @@ CREATE TABLE owned_games (
 
 CREATE INDEX idx_owned_games_canonical_id ON owned_games (canonical_id);
 
+-- Compatibilité Archipelago (voir docs/specs/archipelago-compatibility.md).
+-- Pas de colonne booléenne sur canonical_games (règle "single-value field") :
+-- présence ici avec canonical_id renseigné = ready, absence = non ready.
+CREATE TABLE archipelago_games (
+    id BIGSERIAL PRIMARY KEY,
+    source TEXT NOT NULL CHECK (source IN ('official', 'wiki')),
+    raw_title TEXT NOT NULL,
+    canonical_id BIGINT REFERENCES canonical_games(id) ON DELETE SET NULL,
+    fetched_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE(source, raw_title)
+);
+
+CREATE INDEX idx_archipelago_games_canonical_id ON archipelago_games (canonical_id);
+
 CREATE TABLE rawg_game_credits (
     id BIGSERIAL PRIMARY KEY,
     game_id BIGINT NOT NULL REFERENCES games(id) ON DELETE CASCADE,

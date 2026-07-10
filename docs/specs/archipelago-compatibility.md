@@ -1,7 +1,10 @@
 # Spec — Compatibilité Archipelago
 
-> **Statut : CONCEPTION.** Pas de code écrit. Recherche préliminaire sur les
-> deux sources faite le 2026-07-06 (cf. §7).
+> **Statut : IMPLÉMENTÉ (2026-07-10).** Les deux sources (officielle + wiki)
+> sont crawlées et matchées. Accès wiki débloqué : le 403 du 2026-07-06 était
+> un blocage anti-bot générique, résolu avec un User-Agent réaliste. Champ
+> dérivé `archipelago: boolean` sur `getCanonicalGamesForExport` **non
+> câblé** (aucun consommateur actuel — voir §10).
 
 ## 1. Problème
 
@@ -109,16 +112,38 @@ Matching (incrémental, WHERE canonical_id IS NULL)
 
 ## 8. Lacunes identifiées
 
-- [ ] **Accès à la source wiki non vérifié** (403 rencontré, cf. §7) — à
-  retester avec un client HTTP standard avant d'implémenter le scraper wiki.
-  Si bloquée durablement, la source officielle seule reste suffisante pour
-  une première version.
-- [ ] **Structure exacte du HTML officiel** non figée dans cette spec (juste
-  observée) — le parser précis reste à écrire à l'implémentation ; cette
-  page peut changer sans préavis (scraping = fragile par nature, accepté).
+- [x] **Accès à la source wiki : débloqué (2026-07-10)** — le 403 du
+  2026-07-06 était un blocage anti-bot (Cloudflare/Miraheze), résolu avec un
+  User-Agent réaliste. L'API MediaWiki standard (`action=query&list=categorymembers`)
+  fonctionne, 760 jeux dans `Category:Games` (liste plate, pas de découpage
+  par plateforme — voir §10 pour ce qui change par rapport au plan initial).
+- [x] **Structure du HTML officiel : implémentée (2026-07-10)** — chaque jeu
+  est marqué par un attribut `data-game="Titre"` (81 jeux, vérifié en
+  direct). Pas de suffixe plateforme dans le titre contrairement à
+  l'hypothèse initiale de cette spec (voir §10). Scraping fragile par
+  nature (accepté) : le parser lève une exception explicite si l'attribut
+  disparaît de la page.
 - [ ] **Fréquence de re-crawl** non tranchée ici — dépend de
   [catalog-update-pipeline](catalog-update-pipeline.md) (nouveaux jeux
   Archipelago ajoutés au fil du temps par la communauté).
 - [ ] **Pas de détection de retrait** : un jeu qui disparaît de la liste
   officielle resterait marqué ready indéfiniment — même lacune assumée que
   pour le catalogue principal.
+- [ ] **Champ dérivé `archipelago: boolean`** non ajouté à
+  `getCanonicalGamesForExport` — aucun consommateur actuel (myvault-integration
+  n'est pas implémenté), violerait "zéro code préventif" si ajouté
+  maintenant. À câbler quand un premier consommateur existe.
+
+## 10. Écarts avec le plan initial (constatés à l'implémentation, 2026-07-10)
+
+- **Pas de `platform_hint`** : la colonne prévue en §4 n'a pas été créée —
+  la source wiki retenue est la catégorie plate `Category:Games` (pas
+  `Category:Games_by_platform`, plus simple et suffisante pour matcher),
+  donc aucune plateforme à en extraire. Cohérent avec "zéro colonne sans
+  producteur".
+- **Pas de suffixe plateforme dans les titres officiels** : l'hypothèse
+  `"Adventure (Atari 2600)"` de §1 ne correspond pas aux données réelles —
+  les titres sont propres (`"Adventure"`, `"Sonic Adventure 2 Battle"`).
+  Aucune désambiguïsation par plateforme nécessaire au parsing.
+- Résultat en direct sur le catalogue actuel : 841 entrées crawlées
+  (81 officielles + 760 wiki), 512 matchées à un canonical game.

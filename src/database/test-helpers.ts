@@ -11,7 +11,7 @@ export async function resetDatabase(): Promise<void> {
   await db`
     TRUNCATE
       game_platforms, games, platforms, import_state,
-      steam_players, steam_player_games, owned_games, rawg_game_credits,
+      steam_players, steam_player_games, owned_games, archipelago_games, rawg_game_credits,
       game_companies, companies, game_relationships,
       canonical_game_genres, genres, canonical_games
     CASCADE
