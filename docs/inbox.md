@@ -31,9 +31,12 @@ Questions ouvertes et idées à traiter.
   **Reste à faire** : un nouveau crawl IGDB complet pour combler les trous
   existants (~1-2h, non lancé — décision à prendre séparément).
 
-- fetch mes jeux possédés sur les stores GOG, Epic Game store, Itchio —
-  couvert en partie par [cross-platform-library-model](specs/cross-platform-library-model.md)
-  (modèle `owned_games` conçu pour les accueillir), clients providers pas encore écrits.
+- [x] **Specé le 2026-07-10** : [owned-games-gog-epic-itchio](specs/owned-games-gog-epic-itchio.md)
+  — faisabilité investiguée : Itch.io a une API officielle documentée
+  (`profile/owned-keys`), implémentable directement. GOG et Epic n'ont pas
+  d'API publique pour la bibliothèque perso — mécanismes non officiels
+  identifiés (cookie de session GOG, device-code reverse-engineré côté Epic
+  via `legendary`) mais risque de rupture assumé, implémentation différée.
 - [x] **Implémenté le 2026-07-06 (IGDB)** : [catalog-update-pipeline](specs/catalog-update-pipeline.md)
   — `IgdbProvider.fetchUpdatedSince` + `runIgdbUpdateSweep` (`bun run sweep-igdb`).
   Vérifié en direct : 2143 jeux modifiés détectés sur une fenêtre de 2h,
