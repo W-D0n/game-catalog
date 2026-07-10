@@ -31,14 +31,22 @@ Questions ouvertes et idées à traiter.
   **Reste à faire** : un nouveau crawl IGDB complet pour combler les trous
   existants (~1-2h, non lancé — décision à prendre séparément).
 
-- [x] **Implémenté le 2026-07-10 (Itch.io)** : [owned-games-gog-epic-itchio](specs/owned-games-gog-epic-itchio.md)
-  — `OwnedGamesClient` (interface commune, Steam migré dessus) +
-  `ItchioOwnedGamesClient` (`profile/owned-keys`, vérifié en direct,
-  `bun run export-itchio-library`).
-- [ ] **GOG/Epic (owned-games-gog-epic-itchio §9)** : procédure d'obtention
-  des identifiants documentée (base locale Galaxy ou cookie de session pour
-  GOG, flow `legendary` pour Epic) mais aucun identifiant en main —
-  bloquant tant qu'ils ne sont pas fournis.
+- [x] **Implémenté le 2026-07-10 (Itch.io + GOG)** : [owned-games-gog-epic-itchio](specs/owned-games-gog-epic-itchio.md)
+  — `OwnedGamesClient` (interface commune, Steam/Itch.io/GOG dessus).
+  Itch.io : `profile/owned-keys`, vérifié en direct (`bun run export-itchio-library`).
+  GOG : lecture de la base SQLite locale du client Galaxy (pas de cookie —
+  jeton insuffisant), `bun run export-gog-library`, vérifié en direct
+  (1050 jeux, 948 matchés, y compris des jeux Epic connectés à Galaxy).
+- [ ] **Epic (hors Galaxy)** : aucun identifiant fourni — flow `legendary`
+  documenté (owned-games-gog-epic-itchio §9), bloquant tant qu'il n'est pas
+  fourni. Moins urgent : les jeux Epic déjà liés à un compte Galaxy sont
+  déjà couverts par l'export GOG ci-dessus.
+- [x] **Implémenté le 2026-07-10** : [archipelago-compatibility](specs/archipelago-compatibility.md)
+  — les deux sources (officielle 81 jeux + wiki 760 jeux) crawlées et
+  matchées (`bun run import-archipelago-games`), 512/841 liés au catalogue
+  canonique. Accès wiki débloqué (le 403 du 2026-07-06 était anti-bot).
+  Champ dérivé `archipelago: boolean` non câblé sur l'export (pas de
+  consommateur actuel).
 - [x] **Implémenté le 2026-07-06 (IGDB)** : [catalog-update-pipeline](specs/catalog-update-pipeline.md)
   — `IgdbProvider.fetchUpdatedSince` + `runIgdbUpdateSweep` (`bun run sweep-igdb`).
   Vérifié en direct : 2143 jeux modifiés détectés sur une fenêtre de 2h,
@@ -49,9 +57,6 @@ Questions ouvertes et idées à traiter.
   `export-steam-library.ts`/`enrich-rawg-library.ts` migrés,
   `steam_library_games` droppée. `steam_player_games` reste distinct
   (croisement entre tiers, notion différente).
-- [x] **Specé le 2026-07-06** : [archipelago-compatibility](specs/archipelago-compatibility.md)
-  — champ dérivé `archipelago: boolean`, scraping liste officielle
-  confirmé faisable, accès wiki non vérifié (403 rencontré), non implémenté.
 - [x] **Specé le 2026-07-06** : [myvault-integration](specs/myvault-integration.md)
   — contrat côté game-catalog, mode de transport (DB directe / export JSON
   / API) explicitement non tranché, bloquant tant que la stack MyVault n'est pas connue.
