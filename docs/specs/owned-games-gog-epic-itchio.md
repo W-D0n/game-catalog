@@ -1,6 +1,7 @@
 # Spec — Clients bibliothèque possédée GOG / Epic Games Store / Itch.io
 
-> **Statut : CONCEPTION.** Pas de code écrit. Dépend de
+> **Statut : Itch.io et GOG implémentés (2026-07-10).** Epic reste en
+> conception (aucun identifiant fourni). Dépend de
 > [cross-platform-library-model](cross-platform-library-model.md) (`owned_games`,
 > `matchOwnedGames`), déjà implémenté pour Steam.
 
@@ -92,51 +93,46 @@ garantie de continuité de service).
 |---|---|---|
 | Domaine | jeu possédé introuvable dans le catalogue canonique | `canonical_id` reste `NULL` (déjà couvert par `matchOwnedGames`) |
 | Infra | clé API itch.io absente/invalide | échec explicite au démarrage (`requireEnv`, comme Steam) |
-| Infra | cookie de session GOG expiré | HTTP 401/redirection login → exception explicite, pas de bibliothèque vide silencieuse |
 | Infra | device code Epic expiré/révoqué | échec explicite à l'étape d'auth, avant tout appel entitlements |
+| Domaine | jeu GOG lié depuis une plateforme externe (Epic) sans titre synchronisé côté Galaxy (`{"title": null}`) | ignoré et compté (`console.log`), pas d'insertion `raw_title` NULL — vérifié en direct : 10 jeux concernés sur la bibliothèque réelle |
 
 ## 8. Lacunes identifiées
 
 - [x] **`OwnedGamesClient` (interface commune) : FAIT (2026-07-10)** —
-  `src/providers/owned-games-client.ts`, Steam (`steamOwnedGamesClient`) et
-  Itch.io (`itchioOwnedGamesClient`) l'implémentent tous les deux.
+  `src/providers/owned-games-client.ts`, Steam (`steamOwnedGamesClient`),
+  Itch.io (`itchioOwnedGamesClient`) et GOG (`gogOwnedGamesClient`)
+  l'implémentent tous.
 - [x] **Itch.io : FAIT (2026-07-10)** — voir §2, API officielle vérifiée en
   direct.
-- [ ] **GOG et Epic non implémentés** : faisabilité confirmée (§2, §9) mais
-  aucun jeton/cookie disponible pour vérifier en direct (2026-07-10) —
-  implémentation différée jusqu'à ce que les identifiants soient fournis
-  (voir §9 pour la procédure d'obtention).
+- [x] **GOG : FAIT (2026-07-10)** — lecture de la base SQLite locale du
+  client Galaxy (`src/providers/gog/gog-galaxy-db-client.ts`), pas de cookie
+  de session (piste abandonnée, cf. §9). Vérifié en direct : 1050 jeux
+  exportés, 948 matchés (dont des jeux Epic connectés à Galaxy — Galaxy
+  agrège aussi les bibliothèques de plateformes tierces liées au compte).
+- [ ] **Epic (hors Galaxy) non implémenté** : faisabilité confirmée (§2, §9)
+  mais aucun jeton disponible pour vérifier en direct (2026-07-10) — reste
+  pertinent pour les comptes Epic non connectés à un client GOG Galaxy.
 
 ## 9. Procédure d'obtention des identifiants (GOG, Epic)
 
-Investiguée le 2026-07-10, non exécutée (aucun identifiant en main à ce
-stade) — à suivre avant de coder le client correspondant.
+### GOG : FAIT (2026-07-10)
 
-### GOG
+Base locale GOG Galaxy retenue (cookie de session écarté — jeton fourni
+insuffisant, un header `Cookie: nom=valeur` complet aurait été nécessaire,
+non retesté). Schéma confirmé par inspection directe de
+`galaxy-2.0.db` : `LibraryReleases` (releaseKey par utilisateur) jointe à
+`GamePieces`/`GamePieceTypes` (`type='title'`, valeur JSON `{"title": ...}`)
+donne le titre. Fonctionne aussi pour les jeux liés depuis des plateformes
+tierces connectées à Galaxy (Epic notamment, préfixe `releaseKey` différent
+— `epic_...`), avec des lacunes de données ponctuelles (`title: null`)
+traitées explicitement (§7).
 
-Deux mécanismes possibles, à départager une fois testés :
-
-1. **Base locale GOG Galaxy (préférée si le script tourne sur cette
-   machine)** — le client GOG Galaxy stocke sa bibliothèque dans un fichier
-   SQLite local (`%ProgramData%\GOG.com\Galaxy\storage\galaxy-2.0.db`,
-   confirmé par les forums GOG et l'outil communautaire `g-export`, qui lit
-   ce fichier directement plutôt que d'appeler une API distante). Aucune
-   authentification réseau nécessaire, mais dépend de la présence du client
-   Galaxy installé et à jour sur la machine qui exécute le script — modèle
-   différent de Steam/Itch.io (pas un `fetch()` HTTP, un accès fichier
-   local). Schéma exact des tables (nom de la table listant les jeux
-   possédés) non confirmé — à extraire par inspection directe du fichier
-   une fois localisé.
-2. **Cookie de session GOG (`embed.gog.com/user/data/games`)** — se
-   connecter à gog.com dans un navigateur, extraire le cookie de session
-   depuis les devtools, le fournir en variable d'environnement
-   (`GOG_SESSION_COOKIE`). Fragile (expire, non documenté officiellement),
-   mais fonctionne indépendamment de la machine (pas besoin du client
-   Galaxy installé).
-
-**Décision à prendre avant d'implémenter** : lire la base locale (fiable
-tant que Galaxy est installé ici) ou le cookie de session (portable mais
-fragile) — pas les deux d'emblée (zéro code préventif).
+Piste écartée : cookie de session GOG (`embed.gog.com/user/data/games`).
+Le jeton fourni était brut (pas un header `Cookie: nom=valeur` complet),
+d'où un 302 vers le login — non retesté avec le bon format car la base
+locale fonctionnait déjà et évite la fragilité d'un cookie qui expire.
+Limite acceptée : ne fonctionne que sur une machine où Galaxy est installé
+(pas un `fetch()` HTTP portable comme Steam/Itch.io).
 
 ### Epic Games Store
 
