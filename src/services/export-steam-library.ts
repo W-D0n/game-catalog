@@ -1,4 +1,4 @@
-import { fetchSteamLibrary } from "../providers/steam/steam-library-client";
+import { steamOwnedGamesClient } from "../providers/steam/steam-library-client";
 import { saveOwnedGame, getOwnedGamesByPlatform } from "../database/owned-games-repository";
 import { matchOwnedGames } from "./match-owned-games";
 import { getCanonicalGamesForExport, type CanonicalGameExport } from "../database/canonical-repository";
@@ -21,11 +21,11 @@ export interface SteamLibraryExportEntry {
  * voir docs/specs/cross-platform-library-model.md.
  */
 export async function exportSteamLibrary(): Promise<void> {
-  const steamGames = await fetchSteamLibrary();
+  const steamGames = await steamOwnedGamesClient.fetchLibrary();
   console.log(`Steam : ${steamGames.length} jeux dans la bibliothèque.`);
 
   for (const game of steamGames) {
-    await saveOwnedGame("steam", String(game.appId), game.name);
+    await saveOwnedGame(steamOwnedGamesClient.platform, game.externalId, game.rawTitle);
   }
 
   await matchOwnedGames();

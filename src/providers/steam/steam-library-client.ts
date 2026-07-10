@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireEnv } from "../../config";
+import type { OwnedGamesClient } from "../owned-games-client";
 
 const SteamOwnedGameSchema = z.object({
   appid: z.number(),
@@ -50,3 +51,14 @@ export async function fetchSteamLibrary(): Promise<SteamLibraryGame[]> {
     name: game.name,
   }));
 }
+
+export const steamOwnedGamesClient: OwnedGamesClient = {
+  platform: "steam",
+  async fetchLibrary() {
+    const games = await fetchSteamLibrary();
+    return games.map((game) => ({
+      externalId: String(game.appId),
+      rawTitle: game.name,
+    }));
+  },
+};
