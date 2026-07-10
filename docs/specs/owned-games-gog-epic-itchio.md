@@ -97,12 +97,66 @@ garantie de continuité de service).
 
 ## 8. Lacunes identifiées
 
-- [ ] **GOG et Epic non implémentés** : faisabilité confirmée mais reposant
-  sur des mécanismes non officiels — implémentation différée tant que le
-  risque (rupture sans préavis) n'est pas explicitement accepté.
-- [ ] **`OwnedGamesClient` (interface commune)** : n'existe pas encore —
-  Steam reste une fonction ad hoc (`fetchSteamLibrary`), pas encore un
-  provider au sens de cette interface cible.
-- [ ] **Procédure de renouvellement d'auth GOG/Epic** : non écrite — à
-  produire au moment de l'implémentation, pas avant (dépend du mécanisme
-  concret choisi).
+- [x] **`OwnedGamesClient` (interface commune) : FAIT (2026-07-10)** —
+  `src/providers/owned-games-client.ts`, Steam (`steamOwnedGamesClient`) et
+  Itch.io (`itchioOwnedGamesClient`) l'implémentent tous les deux.
+- [x] **Itch.io : FAIT (2026-07-10)** — voir §2, API officielle vérifiée en
+  direct.
+- [ ] **GOG et Epic non implémentés** : faisabilité confirmée (§2, §9) mais
+  aucun jeton/cookie disponible pour vérifier en direct (2026-07-10) —
+  implémentation différée jusqu'à ce que les identifiants soient fournis
+  (voir §9 pour la procédure d'obtention).
+
+## 9. Procédure d'obtention des identifiants (GOG, Epic)
+
+Investiguée le 2026-07-10, non exécutée (aucun identifiant en main à ce
+stade) — à suivre avant de coder le client correspondant.
+
+### GOG
+
+Deux mécanismes possibles, à départager une fois testés :
+
+1. **Base locale GOG Galaxy (préférée si le script tourne sur cette
+   machine)** — le client GOG Galaxy stocke sa bibliothèque dans un fichier
+   SQLite local (`%ProgramData%\GOG.com\Galaxy\storage\galaxy-2.0.db`,
+   confirmé par les forums GOG et l'outil communautaire `g-export`, qui lit
+   ce fichier directement plutôt que d'appeler une API distante). Aucune
+   authentification réseau nécessaire, mais dépend de la présence du client
+   Galaxy installé et à jour sur la machine qui exécute le script — modèle
+   différent de Steam/Itch.io (pas un `fetch()` HTTP, un accès fichier
+   local). Schéma exact des tables (nom de la table listant les jeux
+   possédés) non confirmé — à extraire par inspection directe du fichier
+   une fois localisé.
+2. **Cookie de session GOG (`embed.gog.com/user/data/games`)** — se
+   connecter à gog.com dans un navigateur, extraire le cookie de session
+   depuis les devtools, le fournir en variable d'environnement
+   (`GOG_SESSION_COOKIE`). Fragile (expire, non documenté officiellement),
+   mais fonctionne indépendamment de la machine (pas besoin du client
+   Galaxy installé).
+
+**Décision à prendre avant d'implémenter** : lire la base locale (fiable
+tant que Galaxy est installé ici) ou le cookie de session (portable mais
+fragile) — pas les deux d'emblée (zéro code préventif).
+
+### Epic Games Store
+
+Pas de mécanisme distant simple. La seule voie connue passe par le flow
+d'authentification reverse-engineré du launcher Epic, tel qu'implémenté par
+le projet open-source `legendary` :
+
+1. Installer/lancer `legendary auth` (ou suivre son flow manuellement) —
+   ouvre la page de login Epic dans un navigateur.
+2. Après connexion, Epic renvoie une réponse JSON contenant un
+   `authorizationCode` à copier.
+3. `legendary` échange ce code contre un jeton d'accès (OAuth, client id du
+   launcher officiel) et le stocke dans sa config locale
+   (`~/.config/legendary/config.ini` sous Linux — emplacement Windows non
+   confirmé).
+4. Le jeton obtenu permettrait d'appeler les mêmes endpoints d'entitlements
+   que `legendary list` — endpoints non documentés officiellement, à
+   observer via le code source de `legendary` (`legendary/api/egs.py`) au
+   moment de l'implémentation plutôt que supposés à l'avance.
+
+**Risque assumé** : ce jeton dépend du client id du launcher Epic — casse
+sans préavis si Epic change son flow d'auth (déjà arrivé par le passé,
+cf. historique des commits de `legendary`).

@@ -31,12 +31,14 @@ Questions ouvertes et idées à traiter.
   **Reste à faire** : un nouveau crawl IGDB complet pour combler les trous
   existants (~1-2h, non lancé — décision à prendre séparément).
 
-- [x] **Specé le 2026-07-10** : [owned-games-gog-epic-itchio](specs/owned-games-gog-epic-itchio.md)
-  — faisabilité investiguée : Itch.io a une API officielle documentée
-  (`profile/owned-keys`), implémentable directement. GOG et Epic n'ont pas
-  d'API publique pour la bibliothèque perso — mécanismes non officiels
-  identifiés (cookie de session GOG, device-code reverse-engineré côté Epic
-  via `legendary`) mais risque de rupture assumé, implémentation différée.
+- [x] **Implémenté le 2026-07-10 (Itch.io)** : [owned-games-gog-epic-itchio](specs/owned-games-gog-epic-itchio.md)
+  — `OwnedGamesClient` (interface commune, Steam migré dessus) +
+  `ItchioOwnedGamesClient` (`profile/owned-keys`, vérifié en direct,
+  `bun run export-itchio-library`).
+- [ ] **GOG/Epic (owned-games-gog-epic-itchio §9)** : procédure d'obtention
+  des identifiants documentée (base locale Galaxy ou cookie de session pour
+  GOG, flow `legendary` pour Epic) mais aucun identifiant en main —
+  bloquant tant qu'ils ne sont pas fournis.
 - [x] **Implémenté le 2026-07-06 (IGDB)** : [catalog-update-pipeline](specs/catalog-update-pipeline.md)
   — `IgdbProvider.fetchUpdatedSince` + `runIgdbUpdateSweep` (`bun run sweep-igdb`).
   Vérifié en direct : 2143 jeux modifiés détectés sur une fenêtre de 2h,
