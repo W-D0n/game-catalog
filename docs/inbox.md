@@ -60,6 +60,12 @@ Questions ouvertes et idées à traiter.
   `export-steam-library.ts`/`enrich-rawg-library.ts` migrés,
   `steam_library_games` droppée. `steam_player_games` reste distinct
   (croisement entre tiers, notion différente).
-- [x] **Specé le 2026-07-06** : [myvault-integration](specs/myvault-integration.md)
-  — contrat côté game-catalog, mode de transport (DB directe / export JSON
-  / API) explicitement non tranché, bloquant tant que la stack MyVault n'est pas connue.
+- [x] **Implémenté côté game-catalog le 2026-07-11** : [myvault-integration](specs/myvault-integration.md)
+  — MyVault gère déjà lui-même l'ownership de sa bibliothèque : décision
+  de ne pas dupliquer, game-catalog fournit un export ponctuel prêt à
+  être importé (regroupé par canonical_id, un jeu multi-plateformes = une
+  seule ligne). `bun run export-myvault-games` →
+  `exports/myvault-games-import.json`, 1207 lignes vérifiées en direct.
+  Réception côté MyVault (extension de modèle + script d'import) hors
+  scope de ce dépôt. Limitation connue : Galaxy référence en interne des
+  jeux Epic connectés (doublons plateforme gog/epic pour un même jeu).

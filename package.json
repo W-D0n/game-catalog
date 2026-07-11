@@ -20,6 +20,7 @@
     "import-archipelago-games": "bun run src/import-archipelago-games.ts",
     "export-gog-library": "bun run src/export-gog-library.ts",
     "export-epic-library": "bun run src/export-epic-library.ts",
+    "export-myvault-games": "bun run src/export-myvault-games.ts",
     "export-steam-wishlist": "bun run src/export-steam-wishlist.ts",
     "cross-steam-libraries": "bun run src/cross-steam-libraries.ts",
     "sweep-igdb": "bun run src/sweep-igdb.ts",

@@ -46,6 +46,25 @@ export interface OwnedGameForExport {
   canonicalId: bigint | null;
 }
 
+export interface OwnedGameAcrossPlatforms extends OwnedGameForExport {
+  platform: string;
+}
+
+/** Bibliothèque possédée toutes plateformes confondues — pour les exports qui regroupent par canonical_id (ex: import MyVault). */
+export async function getAllOwnedGames(): Promise<OwnedGameAcrossPlatforms[]> {
+  const rows = await db<{ platform: string; externalId: string; rawTitle: string; canonicalId: string | null }[]>`
+    SELECT platform, external_id AS "externalId", raw_title AS "rawTitle", canonical_id AS "canonicalId"
+    FROM owned_games
+    ORDER BY platform, raw_title
+  `;
+  return rows.map((row) => ({
+    platform: row.platform,
+    externalId: row.externalId,
+    rawTitle: row.rawTitle,
+    canonicalId: row.canonicalId ? BigInt(row.canonicalId) : null,
+  }));
+}
+
 /** Bibliothèque possédée d'une plateforme, matching déjà résolu (canonical_id persisté) — aucun recalcul à l'export. */
 export async function getOwnedGamesByPlatform(platform: string): Promise<OwnedGameForExport[]> {
   const rows = await db<{ externalId: string; rawTitle: string; canonicalId: string | null }[]>`
