@@ -9,9 +9,11 @@ import {
   saveGameRelationshipsBulk,
   saveGenresBulk,
 } from "./canonical-repository";
+import { saveArchipelagoGame, linkArchipelagoGamesToCanonicalBulk } from "./archipelago-games-repository";
 import { saveGame } from "./game-repository";
 import { savePlatforms } from "./platform-repository";
 import { resetDatabase } from "./test-helpers";
+import { db } from "./db";
 import type { Game } from "../types/game";
 
 beforeEach(async () => {
@@ -46,6 +48,24 @@ describe("getCanonicalGamesForExport", () => {
     expect(exported?.companies).toEqual([]);
     expect(exported?.relationships).toEqual([]);
     expect(exported?.sources).toEqual([{ source: "igdb", sourceId: "1", title: "Solo Game" }]);
+    expect(exported?.archipelago).toBe(false);
+  });
+
+  test("[getCanonicalGamesForExport] archipelago: true si le canonical game est lié à archipelago_games", async () => {
+    const [canonicalId] = await createCanonicalGamesBulk([
+      { title: "Celeste", releaseYear: 2018, releaseStatus: "Released" },
+    ]);
+    await saveArchipelagoGame("official", "Celeste");
+    const [row] = await db<{ id: string }[]>`
+      SELECT id FROM archipelago_games WHERE raw_title = 'Celeste'
+    `;
+    await linkArchipelagoGamesToCanonicalBulk([
+      { archipelagoGameId: BigInt(row!.id), canonicalId: canonicalId! },
+    ]);
+
+    const [exported] = await getCanonicalGamesForExport();
+
+    expect(exported?.archipelago).toBe(true);
   });
 
   test("[getCanonicalGamesForExport] jeu complet avec société, genre et relation", async () => {

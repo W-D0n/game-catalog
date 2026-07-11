@@ -1,10 +1,12 @@
 # Spec — Compatibilité Archipelago
 
-> **Statut : IMPLÉMENTÉ (2026-07-10).** Les deux sources (officielle + wiki)
-> sont crawlées et matchées. Accès wiki débloqué : le 403 du 2026-07-06 était
-> un blocage anti-bot générique, résolu avec un User-Agent réaliste. Champ
-> dérivé `archipelago: boolean` sur `getCanonicalGamesForExport` **non
-> câblé** (aucun consommateur actuel — voir §10).
+> **Statut : IMPLÉMENTÉ (2026-07-10/11).** Les deux sources (officielle +
+> wiki) sont crawlées et matchées. Accès wiki débloqué : le 403 du
+> 2026-07-06 était un blocage anti-bot générique, résolu avec un
+> User-Agent réaliste. Champ dérivé `archipelago: boolean` câblé sur
+> `getCanonicalGamesForExport` (2026-07-11) — remonte désormais dans tous
+> les exports de bibliothèque possédée (Steam/GOG/Itch.io) et le catalogue
+> canonique, sans dépendre de myvault-integration.
 
 ## 1. Problème
 
@@ -129,10 +131,14 @@ Matching (incrémental, WHERE canonical_id IS NULL)
 - [ ] **Pas de détection de retrait** : un jeu qui disparaît de la liste
   officielle resterait marqué ready indéfiniment — même lacune assumée que
   pour le catalogue principal.
-- [ ] **Champ dérivé `archipelago: boolean`** non ajouté à
-  `getCanonicalGamesForExport` — aucun consommateur actuel (myvault-integration
-  n'est pas implémenté), violerait "zéro code préventif" si ajouté
-  maintenant. À câbler quand un premier consommateur existe.
+- [x] **Champ dérivé `archipelago: boolean` : câblé (2026-07-11)** — ajouté
+  à `getCanonicalGamesForExport` (sous-requête `EXISTS` corrélée sur
+  `archipelago_games.canonical_id`, jamais stocké en dur sur
+  `canonical_games`). Le consommateur n'est pas myvault-integration mais les
+  exports de bibliothèque possédée existants (Steam/GOG/Itch.io, chacun
+  embarque déjà `canonicalGame`) — remonte directement dans les infos des
+  jeux possédés, comme demandé, sans dépendre de myvault. Vérifié en
+  direct : 61/1050 jeux GOG marqués `archipelago: true`.
 
 ## 10. Écarts avec le plan initial (constatés à l'implémentation, 2026-07-10)
 

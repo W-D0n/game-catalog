@@ -41,11 +41,3 @@ export async function linkArchipelagoGamesToCanonicalBulk(links: ArchipelagoGame
     WHERE a.id = v.archipelago_game_id
   `;
 }
-
-/** Ensemble des canonical_id ready Archipelago (au moins une source, matching résolu) — pour le champ dérivé d'export. */
-export async function getReadyCanonicalIds(): Promise<Set<string>> {
-  const rows = await db<{ canonicalId: string }[]>`
-    SELECT DISTINCT canonical_id AS "canonicalId" FROM archipelago_games WHERE canonical_id IS NOT NULL
-  `;
-  return new Set(rows.map((row) => row.canonicalId));
-}

@@ -159,6 +159,7 @@ export interface CanonicalGameExport {
   sources: { source: string; sourceId: string; title: string }[];
   relationships: { type: RelationshipType; toId: string; toTitle: string }[];
   media: GameMedia | null;
+  archipelago: boolean;
 }
 
 /** Projection canonique complète pour export — un objet par canonical game, provenance et relations incluses. */
@@ -181,7 +182,10 @@ export async function getCanonicalGamesForExport(): Promise<CanonicalGameExport[
       companies.list AS companies,
       sources.list AS sources,
       relationships.list AS relationships,
-      media.data AS media
+      media.data AS media,
+      EXISTS (
+        SELECT 1 FROM archipelago_games ag WHERE ag.canonical_id = cg.id
+      ) AS archipelago
     FROM canonical_games cg
     LEFT JOIN LATERAL (
       SELECT array_agg(DISTINCT p.name) AS list
