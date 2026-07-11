@@ -1,7 +1,8 @@
 # Spec — Clients bibliothèque possédée GOG / Epic Games Store / Itch.io
 
-> **Statut : Itch.io et GOG implémentés (2026-07-10).** Epic reste en
-> conception (aucun identifiant fourni). Dépend de
+> **Statut : Itch.io, GOG et Epic implémentés (2026-07-10/11).** Les quatre
+> plateformes (Steam, Itch.io, GOG, Epic) alimentent désormais
+> `owned_games` via `OwnedGamesClient`. Dépend de
 > [cross-platform-library-model](cross-platform-library-model.md) (`owned_games`,
 > `matchOwnedGames`), déjà implémenté pour Steam.
 
@@ -100,8 +101,8 @@ garantie de continuité de service).
 
 - [x] **`OwnedGamesClient` (interface commune) : FAIT (2026-07-10)** —
   `src/providers/owned-games-client.ts`, Steam (`steamOwnedGamesClient`),
-  Itch.io (`itchioOwnedGamesClient`) et GOG (`gogOwnedGamesClient`)
-  l'implémentent tous.
+  Itch.io (`itchioOwnedGamesClient`), GOG (`gogOwnedGamesClient`) et Epic
+  (`epicOwnedGamesClient`) l'implémentent tous.
 - [x] **Itch.io : FAIT (2026-07-10)** — voir §2, API officielle vérifiée en
   direct.
 - [x] **GOG : FAIT (2026-07-10)** — lecture de la base SQLite locale du
@@ -109,9 +110,12 @@ garantie de continuité de service).
   de session (piste abandonnée, cf. §9). Vérifié en direct : 1050 jeux
   exportés, 948 matchés (dont des jeux Epic connectés à Galaxy — Galaxy
   agrège aussi les bibliothèques de plateformes tierces liées au compte).
-- [ ] **Epic (hors Galaxy) non implémenté** : faisabilité confirmée (§2, §9)
-  mais aucun jeton disponible pour vérifier en direct (2026-07-10) — reste
-  pertinent pour les comptes Epic non connectés à un client GOG Galaxy.
+- [x] **Epic : FAIT (2026-07-11)** — pas de client Epic maison rejouant le
+  flow OAuth reverse-engineré ; s'appuie sur l'exécutable `legendary`
+  (installé et authentifié manuellement par l'utilisateur, cf. §9), shell-out
+  vers `legendary list --json` (`src/providers/epic/epic-legendary-client.ts`).
+  Vérifié en direct : 408 jeux, 319 matchés. Complémentaire à GOG : les jeux
+  Epic **non** connectés à un compte Galaxy passent par ce client.
 
 ## 9. Procédure d'obtention des identifiants (GOG, Epic)
 
@@ -134,25 +138,27 @@ locale fonctionnait déjà et évite la fragilité d'un cookie qui expire.
 Limite acceptée : ne fonctionne que sur une machine où Galaxy est installé
 (pas un `fetch()` HTTP portable comme Steam/Itch.io).
 
-### Epic Games Store
+### Epic Games Store : FAIT (2026-07-11)
 
-Pas de mécanisme distant simple. La seule voie connue passe par le flow
-d'authentification reverse-engineré du launcher Epic, tel qu'implémenté par
-le projet open-source `legendary` :
+Pas de mécanisme distant simple, et pas de client Epic maison écrit :
+on s'appuie entièrement sur l'exécutable `legendary` (déjà installé et
+authentifié par l'utilisateur), en shell-out. `legendary` gère lui-même
+tout le flow OAuth reverse-engineré du launcher Epic — on ne rejoue rien.
 
-1. Installer/lancer `legendary auth` (ou suivre son flow manuellement) —
-   ouvre la page de login Epic dans un navigateur.
-2. Après connexion, Epic renvoie une réponse JSON contenant un
-   `authorizationCode` à copier.
-3. `legendary` échange ce code contre un jeton d'accès (OAuth, client id du
-   launcher officiel) et le stocke dans sa config locale
-   (`~/.config/legendary/config.ini` sous Linux — emplacement Windows non
-   confirmé).
-4. Le jeton obtenu permettrait d'appeler les mêmes endpoints d'entitlements
-   que `legendary list` — endpoints non documentés officiellement, à
-   observer via le code source de `legendary` (`legendary/api/egs.py`) au
-   moment de l'implémentation plutôt que supposés à l'avance.
+1. `legendary auth --disable-webview` (le webview intégré,
+   `AuthHost.exe`, plantait sur cette machine — probablement WebView2
+   runtime manquant). Ouvre `https://legendary.gl/epiclogin` dans le
+   navigateur ; après connexion, copier l'`authorizationCode` du JSON
+   renvoyé et le coller à l'invite du terminal.
+2. Session mise en cache localement par `legendary`
+   (`C:\Users\<user>\.config\legendary\` sur Windows —
+   `user.json`/`config.ini`, pas besoin d'y toucher directement).
+3. `legendary list --json` retourne un tableau JSON, chaque entrée avec
+   `app_name` (id externe) et `app_title` (titre) au niveau racine —
+   directement exploitable, pas de reverse engineering des endpoints
+   `legendary/api/egs.py` nécessaire.
 
-**Risque assumé** : ce jeton dépend du client id du launcher Epic — casse
-sans préavis si Epic change son flow d'auth (déjà arrivé par le passé,
-cf. historique des commits de `legendary`).
+**Risque assumé** : dépend de la présence de l'exécutable `legendary` et
+d'une session valide en cache (renouvelable par `legendary auth`) — casse
+si Epic change son flow d'auth (legendary devrait suivre, mais avec un
+délai).

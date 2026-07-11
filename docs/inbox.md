@@ -31,22 +31,25 @@ Questions ouvertes et idées à traiter.
   **Reste à faire** : un nouveau crawl IGDB complet pour combler les trous
   existants (~1-2h, non lancé — décision à prendre séparément).
 
-- [x] **Implémenté le 2026-07-10 (Itch.io + GOG)** : [owned-games-gog-epic-itchio](specs/owned-games-gog-epic-itchio.md)
-  — `OwnedGamesClient` (interface commune, Steam/Itch.io/GOG dessus).
+- [x] **Implémenté le 2026-07-10/11 (Itch.io + GOG + Epic)** : [owned-games-gog-epic-itchio](specs/owned-games-gog-epic-itchio.md)
+  — `OwnedGamesClient` (interface commune, Steam/Itch.io/GOG/Epic dessus).
   Itch.io : `profile/owned-keys`, vérifié en direct (`bun run export-itchio-library`).
   GOG : lecture de la base SQLite locale du client Galaxy (pas de cookie —
   jeton insuffisant), `bun run export-gog-library`, vérifié en direct
   (1050 jeux, 948 matchés, y compris des jeux Epic connectés à Galaxy).
-- [ ] **Epic (hors Galaxy)** : aucun identifiant fourni — flow `legendary`
-  documenté (owned-games-gog-epic-itchio §9), bloquant tant qu'il n'est pas
-  fourni. Moins urgent : les jeux Epic déjà liés à un compte Galaxy sont
-  déjà couverts par l'export GOG ci-dessus.
-- [x] **Implémenté le 2026-07-10** : [archipelago-compatibility](specs/archipelago-compatibility.md)
+  Epic : shell-out vers `legendary list --json` (exécutable installé et
+  authentifié manuellement par l'utilisateur, webview intégré cassé →
+  `--disable-webview`), `bun run export-epic-library`, vérifié en direct
+  (408 jeux, 319 matchés) — complète GOG pour les comptes Epic non
+  connectés à Galaxy.
+- [x] **Implémenté le 2026-07-10/11** : [archipelago-compatibility](specs/archipelago-compatibility.md)
   — les deux sources (officielle 81 jeux + wiki 760 jeux) crawlées et
   matchées (`bun run import-archipelago-games`), 512/841 liés au catalogue
   canonique. Accès wiki débloqué (le 403 du 2026-07-06 était anti-bot).
-  Champ dérivé `archipelago: boolean` non câblé sur l'export (pas de
-  consommateur actuel).
+  Champ dérivé `archipelago: boolean` câblé sur `getCanonicalGamesForExport`
+  (remonte dans tous les exports de bibliothèque possédée) — pas besoin
+  d'attendre myvault-integration, le consommateur c'est directement l'export
+  possédé existant.
 - [x] **Implémenté le 2026-07-06 (IGDB)** : [catalog-update-pipeline](specs/catalog-update-pipeline.md)
   — `IgdbProvider.fetchUpdatedSince` + `runIgdbUpdateSweep` (`bun run sweep-igdb`).
   Vérifié en direct : 2143 jeux modifiés détectés sur une fenêtre de 2h,
