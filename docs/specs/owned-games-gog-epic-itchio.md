@@ -107,9 +107,10 @@ garantie de continuité de service).
   direct.
 - [x] **GOG : FAIT (2026-07-10)** — lecture de la base SQLite locale du
   client Galaxy (`src/providers/gog/gog-galaxy-db-client.ts`), pas de cookie
-  de session (piste abandonnée, cf. §9). Vérifié en direct : 1050 jeux
-  exportés, 948 matchés (dont des jeux Epic connectés à Galaxy — Galaxy
-  agrège aussi les bibliothèques de plateformes tierces liées au compte).
+  de session (piste abandonnée, cf. §9). Le comptage historique de 1050 jeux
+  incluait à tort des bibliothèques tierces agrégées par Galaxy. Depuis le
+  2026-07-17, seules les release keys `gog_*` sont acceptées et le snapshot
+  GOG remplace atomiquement les lignes précédentes.
 - [x] **Epic : FAIT (2026-07-11)** — pas de client Epic maison rejouant le
   flow OAuth reverse-engineré ; s'appuie sur l'exécutable `legendary`
   (installé et authentifié manuellement par l'utilisateur, cf. §9), shell-out
@@ -126,10 +127,12 @@ insuffisant, un header `Cookie: nom=valeur` complet aurait été nécessaire,
 non retesté). Schéma confirmé par inspection directe de
 `galaxy-2.0.db` : `LibraryReleases` (releaseKey par utilisateur) jointe à
 `GamePieces`/`GamePieceTypes` (`type='title'`, valeur JSON `{"title": ...}`)
-donne le titre. Fonctionne aussi pour les jeux liés depuis des plateformes
-tierces connectées à Galaxy (Epic notamment, préfixe `releaseKey` différent
-— `epic_...`), avec des lacunes de données ponctuelles (`title: null`)
-traitées explicitement (§7).
+donne le titre. Galaxy expose également des jeux liés depuis des plateformes
+tierces (`epic_*`, `steam_*`) dans ces tables ; ils ne constituent pas une
+possession GOG et sont donc exclus, tout en étant comptés dans le log du run.
+Les lacunes de données ponctuelles
+(`title: null`) sont traitées explicitement (§7). `replaceOwnedGamesForPlatform`
+purge les anciennes lignes non présentes dans le dernier snapshot natif.
 
 Piste écartée : cookie de session GOG (`embed.gog.com/user/data/games`).
 Le jeton fourni était brut (pas un header `Cookie: nom=valeur` complet),

@@ -33,3 +33,33 @@ export async function getGameCredits(gameId: bigint): Promise<RawgPerson[]> {
     slug: row.slug,
   }));
 }
+
+/** Crédits RAWG regroupés par identité canonique, pour les exports de données. */
+export async function getRawgCreditsByCanonicalGame(): Promise<Map<string, RawgPerson[]>> {
+  const rows = await db<
+    { canonicalId: string; rawgPersonId: string; name: string; slug: string | null }[]
+  >`
+    SELECT DISTINCT
+      g.canonical_id AS "canonicalId",
+      rc.rawg_person_id AS "rawgPersonId",
+      rc.name,
+      rc.slug
+    FROM rawg_game_credits rc
+    JOIN games g ON g.id = rc.game_id
+    WHERE g.source = 'rawg' AND g.canonical_id IS NOT NULL
+    ORDER BY g.canonical_id, rc.name
+  `;
+
+  const creditsByCanonicalGame = new Map<string, RawgPerson[]>();
+  for (const row of rows) {
+    const people = creditsByCanonicalGame.get(row.canonicalId) ?? [];
+    people.push({
+      id: Number(row.rawgPersonId),
+      name: row.name,
+      slug: row.slug,
+    });
+    creditsByCanonicalGame.set(row.canonicalId, people);
+  }
+
+  return creditsByCanonicalGame;
+}

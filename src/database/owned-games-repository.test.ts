@@ -3,6 +3,7 @@ import {
   getOwnedGamesByPlatform,
   getUnmatchedOwnedGames,
   linkOwnedGamesToCanonicalBulk,
+  replaceOwnedGamesForPlatform,
   saveOwnedGame,
 } from "./owned-games-repository";
 import { createCanonicalGamesBulk } from "./canonical-repository";
@@ -38,6 +39,24 @@ describe("saveOwnedGame", () => {
     const unmatched = await getUnmatchedOwnedGames();
 
     expect(unmatched).toHaveLength(2);
+  });
+});
+
+describe("replaceOwnedGamesForPlatform", () => {
+  test("[replaceOwnedGamesForPlatform] remplace le snapshot ciblé et préserve les autres plateformes", async () => {
+    await saveOwnedGame("gog", "epic_Blowfish", "FTL: Faster Than Light");
+    await saveOwnedGame("steam", "620", "Portal 2");
+
+    await replaceOwnedGamesForPlatform("gog", [
+      { externalId: "gog_1139279216", rawTitle: "Jotun: Valhalla Edition" },
+    ]);
+
+    expect(await getOwnedGamesByPlatform("gog")).toEqual([
+      { externalId: "gog_1139279216", rawTitle: "Jotun: Valhalla Edition", canonicalId: null },
+    ]);
+    expect(await getOwnedGamesByPlatform("steam")).toEqual([
+      { externalId: "620", rawTitle: "Portal 2", canonicalId: null },
+    ]);
   });
 });
 

@@ -31,22 +31,30 @@ export function fetchGogLibrary(dbPath: string = process.env.GOG_GALAXY_DB_PATH 
       .all();
 
     const games: GogLibraryGame[] = [];
-    let skipped = 0;
+    let skippedWithoutTitle = 0;
+    let skippedThirdParty = 0;
 
     for (const row of rows) {
+      if (!row.releaseKey.startsWith("gog_")) {
+        skippedThirdParty += 1;
+        continue;
+      }
+
       const parsed = JSON.parse(row.titleJson) as { title: string | null };
-      // Certaines entrées (jeux liés depuis une plateforme externe connectée à
-      // Galaxy, ex: Epic) ont un titre jamais synchronisé côté Galaxy
+      // Certaines entrées GOG ont un titre jamais synchronisé côté Galaxy
       // (`{"title": null}`) — vraie lacune de données, pas une erreur de parsing.
       if (parsed.title === null) {
-        skipped += 1;
+        skippedWithoutTitle += 1;
         continue;
       }
       games.push({ releaseKey: row.releaseKey, title: parsed.title });
     }
 
-    if (skipped > 0) {
-      console.log(`GOG Galaxy : ${skipped} jeu(x) sans titre synchronisé, ignorés.`);
+    if (skippedThirdParty > 0) {
+      console.log(`GOG Galaxy : ${skippedThirdParty} entrée(s) tierce(s) ignorée(s).`);
+    }
+    if (skippedWithoutTitle > 0) {
+      console.log(`GOG Galaxy : ${skippedWithoutTitle} jeu(x) sans titre synchronisé, ignorés.`);
     }
 
     return games;

@@ -5,6 +5,7 @@ import { exportGogLibrary } from "./export-gog-library";
 import { createCanonicalGamesBulk, linkGamesToCanonicalBulk } from "../database/canonical-repository";
 import { saveGame } from "../database/game-repository";
 import { savePlatforms } from "../database/platform-repository";
+import { saveOwnedGame } from "../database/owned-games-repository";
 import { resetDatabase } from "../database/test-helpers";
 import type { Game } from "../types/game";
 
@@ -97,6 +98,29 @@ describe("exportGogLibrary", () => {
       {
         releaseKey: "gog_999",
         gogTitle: "Jeu Inconnu Introuvable",
+        matched: false,
+        ambiguousCandidates: 0,
+        canonicalGame: null,
+      },
+    ]);
+  });
+
+  test("[exportGogLibrary] purge les anciennes entrées tierces Galaxy du snapshot GOG", async () => {
+    buildTestGalaxyDb([
+      { releaseKey: "gog_1139279216", title: "Jotun: Valhalla Edition" },
+      { releaseKey: "epic_Blowfish", title: "FTL: Faster Than Light" },
+    ]);
+    await saveOwnedGame("gog", "epic_Blowfish", "FTL: Faster Than Light");
+
+    await exportGogLibrary();
+
+    const fs = await import("node:fs/promises");
+    const exported = JSON.parse(await fs.readFile("./exports/gog-library-enriched.json", "utf-8"));
+
+    expect(exported).toEqual([
+      {
+        releaseKey: "gog_1139279216",
+        gogTitle: "Jotun: Valhalla Edition",
         matched: false,
         ambiguousCandidates: 0,
         canonicalGame: null,

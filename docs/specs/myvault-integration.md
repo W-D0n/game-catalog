@@ -1,8 +1,8 @@
 # Spec — Intégration avec MyVault
 
-> **Statut : Export prêt côté game-catalog (2026-07-11). Import à faire
-> dans une session MyVault dédiée (hors scope de ce dépôt, projet séparé
-> et privé).** Dépendances
+> **Statut : Export prêt côté game-catalog (2026-07-11), complété avec les
+> crédits RAWG et le nettoyage Galaxy (2026-07-17). Réception livrée séparément
+> dans MyVault.** Dépendances
 > ([cross-platform-library-model](cross-platform-library-model.md),
 > [archipelago-compatibility](archipelago-compatibility.md)) implémentées.
 > **Règle stricte : ce projet (game-catalog) ne touche jamais au code ni
@@ -11,15 +11,15 @@
 > **Décision (2026-07-11)** : MyVault gère déjà lui-même l'ownership de sa
 > bibliothèque (récupération directe depuis les plateformes) — game-catalog
 > ne duplique pas ce mécanisme. game-catalog fournit uniquement
-> l'**enrichissement** qu'il calcule déjà (média, genres, companies, statut
-> Archipelago-ready), sous forme d'un **export ponctuel prêt à être
+> l'**enrichissement** qu'il calcule déjà (média, genres, companies, crédits
+> RAWG, statut Archipelago-ready), sous forme d'un **export ponctuel prêt à être
 > importé**, pas une synchronisation permanente ni un accès direct entre
 > les deux bases.
 
 ## 1. Problème
 
 game-catalog calcule un enrichissement (média, genres multiples,
-companies, statut Archipelago) que MyVault n'a pas et ne recalcule pas.
+companies, crédits RAWG, statut Archipelago) que MyVault ne recalcule pas.
 Il faut le rendre consommable sans dupliquer la logique de
 matching/enrichissement déjà présente ici, et sans introduire de
 dépendance réseau permanente entre les deux projets (bases de données
@@ -55,24 +55,25 @@ le détail exact des types) :
   ne gère qu'un genre unique), `year`, `description` — champs "de base",
   probablement déjà supportés par n'importe quel modèle de bibliothèque
   de jeux simple.
-- `archipelago`, `genres` (liste complète), `companies`, `screenshotUrls`,
-  `videoIds`, `storyline` — champs d'enrichissement, qui nécessitent que
+- `archipelago`, `genres` (liste complète), `companies`, `people`,
+  `screenshotUrls`, `videoIds`, `storyline` — champs d'enrichissement, qui nécessitent que
   le système cible ait (ou ajoute) les colonnes correspondantes pour les
-  recevoir.
+  recevoir. `people` transporte `{ source, externalId, name, slug, role }` ;
+  le rôle disponible est `development_team` et la source est RAWG.
 
 Les champs liés au temps de jeu/dernière session/URL boutique sont
 laissés à une valeur neutre : cette donnée n'existe pas côté game-catalog
 (aucune API de possession utilisée ne la fournit) — à peupler par le
 mécanisme d'ownership propre à la cible si besoin, pas par cet import.
 
-**Limitation connue (données réelles)** : le client GOG Galaxy référence
-en interne certains jeux liés depuis un compte Epic connecté — quelques
-jeux apparaissent donc avec un identifiant de possession `gog` dont
-l'id externe est en réalité préfixé par l'identifiant du jeu Epic
-correspondant, en plus de leur vraie entrée `epic`. Ce n'est pas une
-erreur d'export, c'est une caractéristique des données Galaxy elles-mêmes
-(voir [owned-games-gog-epic-itchio](owned-games-gog-epic-itchio.md) §8).
-À filtrer ou dédupliquer côté import si ça pose problème.
+**Nettoyage Galaxy (2026-07-17)** : Galaxy agrège aussi des bibliothèques
+tierces dans `LibraryReleases`. Le client GOG ne conserve désormais que les
+release keys natives `gog_*`. Le service remplace atomiquement le snapshot
+`owned_games(platform='gog')`, ce qui purge les anciennes lignes `epic_*` /
+`steam_*`. MyVault peut conserver son filtre défensif, mais l'export n'émet
+plus ces artefacts. `export-myvault-games` applique aussi cette règle à la
+lecture du snapshot : même si un ancien snapshot pollué n'a pas encore été
+rafraîchi, aucun identifiant Galaxy tiers ne traverse la frontière JSON.
 
 ## 4. Ce qui reste à faire (hors scope de ce dépôt)
 
@@ -94,10 +95,10 @@ idempotence) sont hors scope de ce dépôt.
 
 - [x] **Export game-catalog : FAIT (2026-07-11)** — `bun run export-myvault-games`,
   regroupement par `canonical_id`, testé, vérifié en direct (1207 lignes).
-- [ ] **Réception côté MyVault** (extension de modèle + script d'import) —
-  hors scope de ce dépôt, chantier séparé.
-- [ ] **Doublons Galaxy/Epic** (§3, limitation connue) — décision de
-  filtrage/dédup à prendre côté import.
+- [x] **Réception côté MyVault** — livrée dans le dépôt séparé MyVault ;
+  aucun lien de code, DB ou runtime ajouté depuis ce dépôt.
+- [x] **Doublons Galaxy/Epic** — filtrés à la source et purgés par remplacement
+  atomique du snapshot GOG.
 - [ ] **Temps de jeu / dernière session / URL boutique** toujours neutres
   à l'import — à peupler par le mécanisme d'ownership propre au système
   cible, pas par cet export.

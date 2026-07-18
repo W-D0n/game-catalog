@@ -8,6 +8,48 @@ export async function saveOwnedGame(platform: string, externalId: string, rawTit
   `;
 }
 
+export interface OwnedGameSnapshotItem {
+  externalId: string;
+  rawTitle: string;
+}
+
+/** Remplace atomiquement le snapshot d'une plateforme sans toucher aux autres bibliothèques. */
+export async function replaceOwnedGamesForPlatform(
+  platform: string,
+  games: OwnedGameSnapshotItem[]
+): Promise<void> {
+  await db.begin(async (transaction) => {
+    if (games.length === 0) {
+      await transaction`DELETE FROM owned_games WHERE platform = ${platform}`;
+      return;
+    }
+
+    const fetchedAt = new Date();
+    const values = games.map((game) => ({
+      platform,
+      external_id: game.externalId,
+      raw_title: game.rawTitle,
+      fetched_at: fetchedAt,
+    }));
+
+    await transaction`
+      INSERT INTO owned_games ${transaction(values)}
+      ON CONFLICT (platform, external_id) DO UPDATE SET
+        raw_title = EXCLUDED.raw_title,
+        fetched_at = EXCLUDED.fetched_at
+    `;
+
+    const externalIds = transaction.array(
+      games.map((game) => game.externalId),
+      "TEXT"
+    );
+    await transaction`
+      DELETE FROM owned_games
+      WHERE platform = ${platform} AND external_id <> ALL(${externalIds})
+    `;
+  });
+}
+
 export interface UnmatchedOwnedGame {
   id: bigint;
   rawTitle: string;

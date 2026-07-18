@@ -1,5 +1,5 @@
 import { gogOwnedGamesClient } from "../providers/gog/gog-galaxy-db-client";
-import { saveOwnedGame, getOwnedGamesByPlatform } from "../database/owned-games-repository";
+import { replaceOwnedGamesForPlatform, getOwnedGamesByPlatform } from "../database/owned-games-repository";
 import { matchOwnedGames } from "./match-owned-games";
 import { getCanonicalGamesForExport, type CanonicalGameExport } from "../database/canonical-repository";
 import { exportJson } from "../exporters/export-json";
@@ -23,9 +23,7 @@ export async function exportGogLibrary(): Promise<void> {
   const gogGames = await gogOwnedGamesClient.fetchLibrary();
   console.log(`GOG : ${gogGames.length} jeux dans la bibliothèque.`);
 
-  for (const game of gogGames) {
-    await saveOwnedGame(gogOwnedGamesClient.platform, game.externalId, game.rawTitle);
-  }
+  await replaceOwnedGamesForPlatform(gogOwnedGamesClient.platform, gogGames);
 
   await matchOwnedGames();
 

@@ -2,6 +2,8 @@ import { getAllOwnedGames, type OwnedGameAcrossPlatforms } from "../database/own
 import { getCanonicalGamesForExport, type CanonicalGameExport } from "../database/canonical-repository";
 import { exportJson } from "../exporters/export-json";
 import type { GameCompanyCredit } from "../types/game";
+import { getRawgCreditsByCanonicalGame } from "../database/rawg-credits-repository";
+import type { RawgPerson } from "../providers/rawg/rawg-development-team-client";
 
 /** Forme exacte de myvault.games.platforms (src/lib/domain/library/types.ts, PlatformLink) — playtimeMinutes/lastPlayedAt/storeUrl inconnus depuis game-catalog, laissés à leur valeur neutre. */
 export interface MyvaultPlatformLink {
@@ -10,6 +12,14 @@ export interface MyvaultPlatformLink {
   playtimeMinutes: number;
   lastPlayedAt: string | null;
   storeUrl: string | null;
+}
+
+export interface MyvaultPersonCredit {
+  source: "rawg";
+  externalId: string;
+  name: string;
+  slug: string | null;
+  role: "development_team";
 }
 
 /**
@@ -31,6 +41,7 @@ export interface MyvaultGameImportRow {
   screenshotUrls: string[];
   videoIds: string[];
   storyline: string | null;
+  people: MyvaultPersonCredit[];
 }
 
 function toPlatformLink(owned: OwnedGameAcrossPlatforms): MyvaultPlatformLink {
@@ -43,7 +54,11 @@ function toPlatformLink(owned: OwnedGameAcrossPlatforms): MyvaultPlatformLink {
   };
 }
 
-function toImportRow(canonicalGame: CanonicalGameExport | null, group: OwnedGameAcrossPlatforms[]): MyvaultGameImportRow {
+function toImportRow(
+  canonicalGame: CanonicalGameExport | null,
+  group: OwnedGameAcrossPlatforms[],
+  people: RawgPerson[]
+): MyvaultGameImportRow {
   return {
     title: canonicalGame?.title ?? group[0]!.rawTitle,
     coverUrl: canonicalGame?.media?.coverUrl ?? null,
@@ -57,7 +72,18 @@ function toImportRow(canonicalGame: CanonicalGameExport | null, group: OwnedGame
     screenshotUrls: canonicalGame?.media?.screenshotUrls ?? [],
     videoIds: canonicalGame?.media?.videoIds ?? [],
     storyline: canonicalGame?.media?.storyline ?? null,
+    people: people.map((person) => ({
+      source: "rawg",
+      externalId: String(person.id),
+      name: person.name,
+      slug: person.slug,
+      role: "development_team",
+    })),
   };
+}
+
+function isTrustedOwnedGame(owned: OwnedGameAcrossPlatforms): boolean {
+  return owned.platform !== "gog" || owned.externalId.startsWith("gog_");
 }
 
 /**
@@ -68,8 +94,9 @@ function toImportRow(canonicalGame: CanonicalGameExport | null, group: OwnedGame
  * (aucun regroupement possible sans identité commune).
  */
 export async function buildMyvaultGamesImport(): Promise<MyvaultGameImportRow[]> {
-  const ownedGames = await getAllOwnedGames();
+  const ownedGames = (await getAllOwnedGames()).filter(isTrustedOwnedGame);
   const canonicalGames = await getCanonicalGamesForExport();
+  const creditsByCanonicalGame = await getRawgCreditsByCanonicalGame();
   const canonicalById = new Map(canonicalGames.map((g) => [g.id, g]));
 
   const groups = new Map<string, { canonicalGame: CanonicalGameExport | null; ownedGames: OwnedGameAcrossPlatforms[] }>();
@@ -86,7 +113,13 @@ export async function buildMyvaultGamesImport(): Promise<MyvaultGameImportRow[]>
     }
   }
 
-  return Array.from(groups.values()).map(({ canonicalGame, ownedGames: group }) => toImportRow(canonicalGame, group));
+  return Array.from(groups.values()).map(({ canonicalGame, ownedGames: group }) =>
+    toImportRow(
+      canonicalGame,
+      group,
+      canonicalGame ? (creditsByCanonicalGame.get(canonicalGame.id) ?? []) : []
+    )
+  );
 }
 
 export async function exportMyvaultGamesImport(): Promise<void> {
