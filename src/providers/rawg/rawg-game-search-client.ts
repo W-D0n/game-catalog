@@ -85,7 +85,10 @@ export async function searchRawgGameByTitle(
       }
 
       if (response.status === 401) {
-        throw new ProviderError("rawg", `recherche \"${title}\" : clé RAWG rejetée (HTTP 401)`);
+        throw new ProviderQuotaError(
+          "rawg",
+          `recherche \"${title}\" : authentification ou quota (HTTP 401)`
+        );
       }
       if (response.status === 403 || response.status === 429) {
         throw new ProviderQuotaError(

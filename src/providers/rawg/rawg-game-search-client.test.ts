@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { searchRawgGameByTitle } from "./rawg-game-search-client";
+import { ProviderQuotaError } from "../provider";
 
 describe("searchRawgGameByTitle", () => {
   const originalFetch = global.fetch;
@@ -69,12 +70,13 @@ describe("searchRawgGameByTitle", () => {
     expect(result?.sourceId).toBe("3498");
   });
 
-  test("[searchRawgGameByTitle] 401 signale une clé rejetée", async () => {
+  test("[searchRawgGameByTitle] 401 signale une authentification ou un quota et permet l'arrêt propre", async () => {
     global.fetch = (() =>
       Promise.resolve(new Response("Unauthorized", { status: 401 }))) as unknown as typeof fetch;
 
+    await expect(searchRawgGameByTitle("Hades", 2020)).rejects.toBeInstanceOf(ProviderQuotaError);
     await expect(searchRawgGameByTitle("Hades", 2020)).rejects.toThrow(
-      'recherche "Hades" : clé RAWG rejetée (HTTP 401)'
+      'recherche "Hades" : authentification ou quota (HTTP 401)'
     );
   });
 });

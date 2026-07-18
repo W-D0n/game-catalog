@@ -62,9 +62,9 @@ export async function fetchDevelopmentTeam(rawgGameId: string): Promise<RawgPers
       }
 
       if (response.status === 401) {
-        throw new ProviderError(
+        throw new ProviderQuotaError(
           "rawg",
-          `development-team ${rawgGameId} : clé RAWG rejetée (HTTP 401)`
+          `development-team ${rawgGameId} : authentification ou quota (HTTP 401)`
         );
       }
 
