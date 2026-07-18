@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { fetchDevelopmentTeam } from "./rawg-development-team-client";
-import { ProviderError, ProviderQuotaError } from "../provider";
+import { ProviderError } from "../provider";
 
 describe("fetchDevelopmentTeam", () => {
   const originalFetch = global.fetch;
@@ -38,11 +38,11 @@ describe("fetchDevelopmentTeam", () => {
     expect(await fetchDevelopmentTeam("1")).toEqual([]);
   });
 
-  test("[fetchDevelopmentTeam] 401 rejette avec ProviderQuotaError", async () => {
+  test("[fetchDevelopmentTeam] 401 signale une clé rejetée", async () => {
     global.fetch = (() =>
       Promise.resolve(new Response("Unauthorized", { status: 401 }))) as unknown as typeof fetch;
 
-    await expect(fetchDevelopmentTeam("1")).rejects.toThrow(ProviderQuotaError);
+    await expect(fetchDevelopmentTeam("1")).rejects.toThrow("clé RAWG rejetée (HTTP 401)");
   });
 
   test("[fetchDevelopmentTeam] 404 permanent rejette avec ProviderError", async () => {

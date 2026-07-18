@@ -61,10 +61,17 @@ export async function fetchDevelopmentTeam(rawgGameId: string): Promise<RawgPers
         }));
       }
 
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
+        throw new ProviderError(
+          "rawg",
+          `development-team ${rawgGameId} : clé RAWG rejetée (HTTP 401)`
+        );
+      }
+
+      if (response.status === 403 || response.status === 429) {
         throw new ProviderQuotaError(
           "rawg",
-          `development-team ${rawgGameId} : clé invalide ou quota épuisé (HTTP ${response.status})`
+          `development-team ${rawgGameId} : quota épuisé ou accès refusé (HTTP ${response.status})`
         );
       }
 

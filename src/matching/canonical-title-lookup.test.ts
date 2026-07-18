@@ -14,6 +14,7 @@ function buildCanonical(overrides: Partial<CanonicalGameExport>): CanonicalGameE
     sources: [],
     relationships: [],
     media: null,
+    archipelago: false,
     ...overrides,
   };
 }

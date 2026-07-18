@@ -151,3 +151,18 @@ CREATE TABLE rawg_game_credits (
     fetched_at TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE(game_id, rawg_person_id)
 );
+
+CREATE TABLE rawg_enrichment_state (
+    canonical_id BIGINT PRIMARY KEY REFERENCES canonical_games(id) ON DELETE CASCADE,
+    rawg_game_id BIGINT REFERENCES games(id) ON DELETE CASCADE,
+    status TEXT NOT NULL CHECK (status IN ('not_found', 'completed')),
+    searched_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CHECK (
+        (status = 'completed' AND rawg_game_id IS NOT NULL)
+        OR (status = 'not_found' AND rawg_game_id IS NULL)
+    )
+);
+
+CREATE UNIQUE INDEX idx_rawg_enrichment_state_game_id
+    ON rawg_enrichment_state (rawg_game_id)
+    WHERE rawg_game_id IS NOT NULL;

@@ -114,20 +114,17 @@ Remplace chaque `process.env.X!` par `requireEnv("X")`.
 
 ### 3.2 Suivi de progression pour `enrichRawgLibrary` — **fait**
 
-Aucun état persistant (contrairement à `import_state` pour le backfill
-principal) — un run interrompu par le quota (déjà observé) redémarre du
-début à la prochaine tentative, sans garantie d'ordre (`getGameIdentitiesBySource`
-n'a pas de `ORDER BY`), gaspillant un quota RAWG rare.
-
-`ORDER BY id` ajouté à `getGameIdentitiesBySource`, filtrage via
-`getGameIdsWithCredits()` avant de re-traiter.
+`rawg_enrichment_state` mémorise les recherches exactes sans résultat et les
+équipes récupérées, y compris vides. Crédits et statut `completed` sont écrits
+dans une transaction unique. Un arrêt sur quota reprend donc sans rejouer un
+appel abouti ni considérer une équipe partiellement écrite comme terminée.
 
 ### 3.3 Cohérence de normalisation de titre — **fait**
 
-`enrich-rawg-library.ts` utilise encore `normalizeTitle` (agressif) pour le
-matching bibliothèque Steam ↔ RAWG, alors que `normalizeMatchingTitle`
-existe précisément pour éviter le bug de collision des titres
-ponctuation-only (Session 3/4). Aligné.
+La recherche RAWG est bornée aux titres canoniques réellement possédés et
+demande `search_exact=true`. Le résultat n'est accepté que si son titre passe
+la même normalisation conservatrice `normalizeMatchingTitle`; aucun résultat
+approximatif n'est relié automatiquement.
 
 ### 3.4 Plafond de taille sur les groupes de blocking — **fait**
 

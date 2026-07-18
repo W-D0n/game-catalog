@@ -60,6 +60,13 @@ le détail exact des types) :
   le système cible ait (ou ajoute) les colonnes correspondantes pour les
   recevoir. `people` transporte `{ source, externalId, name, slug, role }` ;
   le rôle disponible est `development_team` et la source est RAWG.
+  `bun run enrich-rawg-library` ne parcourt plus le catalogue RAWG complet :
+  il recherche seulement les titres canoniques présents dans `owned_games`,
+  accepte un match exact normalisé, le relie au canonical existant puis
+  récupère `development-team`. Le marqueur de fetch rend la commande
+  reprenable, y compris pour les équipes vides.
+  La commande travaille uniquement sur le snapshot `owned_games` déjà persisté ;
+  les refresh Steam/GOG/Epic/Itch restent des commandes préalables séparées.
 
 Les champs liés au temps de jeu/dernière session/URL boutique sont
 laissés à une valeur neutre : cette donnée n'existe pas côté game-catalog
